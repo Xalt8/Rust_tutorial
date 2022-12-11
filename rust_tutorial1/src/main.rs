@@ -124,9 +124,68 @@ fn strings_example(){
         println!("{} word: {}", i, word);
     }
 
+    let str2: String = str1.replace("A", "Another");
+    println!("New string {}", str2);
+    
+    let str3 = String::from("z y x x w w v u");
+    let mut v1: Vec<char> = str3.chars().collect();
+    v1.sort();
+    v1.dedup(); // remove duplicates
+    for ch in v1{
+        println!("{}", ch)
+    }
+    
+    // Create a string literal
+    let str4: &str = "Random string";
+    // Heap allocated string
+    let mut str5: String = str4.to_string();
+    println!("{}, {}", str5, str4);
+
+    // Convert a string to a byte array
+    let byte_array = str5.as_bytes();
+
+    // String slice
+    let str6 = &str5[0..=5];
+    println!("string slice = {}, string length = {}", str6, str6.len());
+    str5.clear();
+    println!("deleted str5 = {}", str5);   
+
+    // Combine strings
+    let str7 = String::from("Just a");
+    let str9 = String::from(" another day");
+    let str8 = str7 + &str9;
+    println!("Combined string = {}", str8); 
+
+    // Convert string to unicode
+    for cha in str8.bytes(){
+        println!("Unicode string {}", cha)
+    }
+}
+
+fn enum_example(){
+    enum Day {
+        Monday, 
+        Tuesday, 
+        Wednesday,
+        Thursday,
+        Friday,
+        Saturday,
+        Sunday
+    }
+
+    impl Day {
+        fn is_weekend(&self) -> bool {
+            match self{
+                Day::Saturday | Day::Sunday => true,
+                _ => false,
+            }
+        }
+    }
+    let today:Day = Day::Monday;
+    println!("Is today a weekend? {}", today.is_weekend());
 }
 
 
 fn main() {
-    strings_example()
+    enum_example()
 }
