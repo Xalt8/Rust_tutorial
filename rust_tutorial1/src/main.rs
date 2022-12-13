@@ -6,6 +6,7 @@ use std::io::{Write, BufRead, BufReader, ErrorKind};
 use std::fs::File;
 use rand::Rng;
 use std::cmp::Ordering;
+use std::ops::Add; // Traits -> specify the functionality for different data types
 
 fn greeting(){
     /// Ask the user their name from CL
@@ -186,6 +187,66 @@ fn enum_example(){
 }
 
 
+fn vector_example(){
+    // Vectors are like arrays -> they can grow if mutable
+    // They can only store values of the same type
+    let vec1: Vec<i32> = Vec::new();
+    let mut vec2 = vec![1,2,3,4];
+    println!("vec2 before push = {:?}", vec2);
+    vec2.push(5);
+    println!("vec2 after push = {:?} and first val = {}", vec2, vec2[0]);
+    
+    // We need to dereference i by using the " * " before we can use it to multiply
+    // We also need to "&mut" before we can change values in vec2
+    for i in &mut vec2{
+        *i *= 2;
+    } 
+    println!("vec2 after multiplication = {:?}", vec2);
+}
+
+fn sum_list_example(list: &[i32]) -> i32{
+    let mut sum: i32 = 0;
+    for &val in list.iter(){
+        sum += &val
+    }
+    return sum;
+}
+
+fn sum_list_example2(list: &[i32]) -> i32{
+    // let mut sum: i32 = 0;
+    let sum = list.iter().sum();
+    return sum;
+}
+
+fn generics_example<T:Add <Output = T >>(x:T, y:T) -> T {
+    // Specify the data types to be used at a later time
+    // Used when we have functions that have multiple different types of data
+    // Defined using <T>
+    // Cannot used x + y with generics
+    // Used the trait Add imported above -> all types that allow Addition can be used
+    return x + y; 
+}
+
+fn ownership_example(){
+    // Stack: stores values in the Last in First Out (LIFO)
+    //      Data stored in stack must have defined size
+    // Heap: When putting data on the heap -> you request for 
+    // a certain amount of space. The OS finds the space and 
+    // returns a pointer to that space.
+    // RULES:
+    // 1) Each value have a variable that's called it owner
+    // 2) There is only one owner at a time
+    // 3) When the owner goes out of scope the value dissapears  
+
+    let str1 = String::from("World");
+    let str2 = str1; // cannot use str1 -> ownership moved to str2
+    
+    let str3 = String::from("World");
+    let str4 = str3.clone(); // creates a copy can use str3
+    println!("Hello {}", str3);
+
+}
+
 fn main() {
-    enum_example()
+    ownership_example()
 }
