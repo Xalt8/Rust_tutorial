@@ -7,6 +7,8 @@ use std::fs::File;
 use rand::Rng;
 use std::cmp::Ordering;
 use std::ops::Add; // Traits -> specify the functionality for different data types
+use std::collections::HashMap;
+
 
 fn greeting(){
     /// Ask the user their name from CL
@@ -247,6 +249,47 @@ fn ownership_example(){
 
 }
 
+fn hash_map_example(){
+    let mut heroes = HashMap::new();
+    heroes.insert("Superman", "Clark Kent");
+    heroes.insert("Batman", "Bruce Wayne");
+    heroes.insert("The Flash", "Barry Allen");
+
+    for (k,v) in heroes.iter(){
+        println!("{} = {}", k,v);
+    }
+
+    if heroes.contains_key(&"Batman"){
+        let the_batman = heroes.get(&"Batman");
+        match the_batman {
+            Some(x) => println!("Batman is the Dark Knight"),
+            None => println!("Batman not found"),
+        };
+    }
+}
+
+
+fn struct_example(){
+    #[derive(Debug)] // Use to print the struct
+    struct Customer{
+        name: String,
+        address: String,
+        balance: f64,
+    }
+
+    let mut bob = Customer{
+        name:String::from("Bob Smith"),
+        address:String::from("255 Main St"),
+        balance: 234.50,
+    };
+    println!("{:?}", bob);
+
+    // Change a struct value:
+    bob.address = String::from("505 Main St");
+    println!("{:?}", bob);
+}
+
+
 fn main() {
-    ownership_example()
+    struct_example()
 }
