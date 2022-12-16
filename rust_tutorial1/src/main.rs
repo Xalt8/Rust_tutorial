@@ -9,6 +9,9 @@ use std::cmp::Ordering;
 use std::ops::Add; // Traits -> specify the functionality for different data types
 use std::collections::HashMap;
 
+mod restaurant;
+use crate::restaurant::order_food;
+
 
 fn greeting(){
     /// Ask the user their name from CL
@@ -289,7 +292,72 @@ fn struct_example(){
     println!("{:?}", bob);
 }
 
+fn trait_example() {
+    
+    const PI:f32 = 3.141;
+    
+    // Traits are similar to interfaces 
+    // have methods that must be implemented
+    trait Shape{
+        fn new(length: f32, width: f32) -> Self; // constructor 
+        fn area(&self) -> f32; // will receive a shape and return f32
+    }
+
+    struct Rectangle {length: f32, width: f32};
+    struct Circle {length: f32, width: f32};
+
+    // Implement the Shape trait for rectangle:
+    impl Shape for Rectangle{
+        // constructor
+        fn new(length:f32, width:f32) -> Rectangle {
+            return Rectangle{length, width};
+        }
+        fn area(&self) -> f32 {
+            return self.length * self.width;
+        }
+    }
+
+    // Implement the Shape trait for circle:
+    impl Shape for Circle{
+        // constructor
+        fn new(length:f32, width:f32) -> Circle {
+            return Circle{length, width};
+        }
+        fn area(&self) -> f32 {
+            return (self.length/2.0).powf(2.0) * PI;
+        }
+    }
+
+    let rec: Rectangle = Shape::new(10.0, 15.0);
+    let circ: Circle = Shape::new(10.0, 15.0);
+
+    println!("Rect area = {}", rec.area());
+    println!("Circ area = {}", circ.area());
+}
+
+fn io_error_handling() {
+    // create a file
+    let path: "lines.txt";
+    let output = File::create(path);
+    // Result has 2 varients Ok or Error -> 
+    // Result<T, U> {
+    //  Ok(T) -> returns the type of data 
+    //  Error(U) -> returns type of error
+    // }
+    let mut output = match {
+        Ok(file) => file,
+        Err(error) => {
+            panic!("Problem creating file: {:?}", error),
+        };
+    };
+    // Write to file
+    write!(output, "Some \n random words").expect("Failed to write to file");
+
+    // Open a file and un-wrap and return the file if no panic
+    let input = File::open(path).unwrap()
+}
+
 
 fn main() {
-    struct_example()
+    io_error_handling()
 }
