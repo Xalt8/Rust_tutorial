@@ -337,24 +337,42 @@ fn trait_example() {
 
 fn io_error_handling() {
     // create a file
-    let path: "lines.txt";
+    let path: &str = "lines.txt";
     let output = File::create(path);
     // Result has 2 varients Ok or Error -> 
     // Result<T, U> {
     //  Ok(T) -> returns the type of data 
     //  Error(U) -> returns type of error
     // }
-    let mut output = match {
+    let mut output = match output {
         Ok(file) => file,
         Err(error) => {
-            panic!("Problem creating file: {:?}", error),
-        };
+            panic!("Problem creating file: {:?}", error);
+        }
     };
     // Write to file
     write!(output, "Some \n random words").expect("Failed to write to file");
 
-    // Open a file and un-wrap and return the file if no panic
-    let input = File::open(path).unwrap()
+    // Open a file and unwrap ignores the result and returns the file if no error
+    let input = File::open(path).unwrap();
+
+    // Gets it line-by-line
+    let buffered = BufReader::new(input);
+    for line in buffered.lines(){
+        println!("buffered lines = {}", line.unwrap());
+    }
+
+    let output2 = File::create("rand.txt");
+    let output2 = match output2 {
+        Ok(file) => file,
+        Err(error) => match error.kind() {
+            ErrorKind::NotFound => match File::create("rand.txt"){
+                Ok(fc) => fc,
+                Err(error) => panic!("cant't create file {:?}", error),
+            },
+            _other_error => panic!("Problem opening file: {:?}", error),
+        },
+    };
 }
 
 
