@@ -8,6 +8,11 @@ use rand::Rng;
 use std::cmp::Ordering;
 use std::ops::Add; // Traits -> specify the functionality for different data types
 use std::collections::HashMap;
+use std::thread; 
+use std::time::Duration;
+use std::rc::Rc;
+use std::cell::RefCell;
+use std::sync::{Arc, Mutex};
 
 mod restaurant;
 use crate::restaurant::order_food;
@@ -375,7 +380,140 @@ fn io_error_handling() {
     };
 }
 
+fn closure_example() {
+    // Closure -> function without a name 
+    // can be stored in a variable
+    // Can be passed into another function
+    // let var_name = |parameters| -> return type {BODY}
+
+    let can_vote = |age:i32| {
+        age >= 18
+    };
+    println!("Can vote = {}", can_vote(8));
+
+    let mut samp1 = 5;
+    let print_var = || println!("samp1 = {}", samp1);
+    print_var();
+
+    samp1 = 10;
+    let mut change_var = || samp1 += 1;
+    change_var();
+    println!("sampl1 = {}", samp1);
+    samp1 = 10;
+    println!("sampl1 = {}", samp1);
+}
+
+
+fn closure_example2() {
+    // Pass a closure to another function
+    // Use the 'where' key word to specify the closure's types
+    fn use_func<T>(a:i32, b:i32, func:T) -> i32
+    where T: Fn(i32, i32) -> i32 {
+        func(a, b)
+    }
+    let sum = |a, b| a + b;
+    let prod = |a, b| a * b;
+
+    println!("5 + 4 = {}", use_func(5, 4, sum));
+    println!("5 * 4 = {}", use_func(5, 4, prod));
+
+}
+
+fn smart_pointer_example() {
+    // Pointer is an address to a location in memory
+    // use the & keyword to borrow a value rather than taking it having it cleaned out of memory
+    // Strings and vectors are also smart pointers 
+    // They own the data and also have functions to manipulate the data
+    // Smart pointers have functions beyond referencing a specific location in memory
+
+    // BOX stores data on a heap not stack
+    let b_int1 = Box::new(10);
+    println!("b_int1 = {}", b_int1);
+
+    // Create a binary tree data structure utilizing BOX
+    #[derive(Debug)]
+    struct TreeNode<T> {
+        pub left: Option<Box<TreeNode<T>>>,
+        pub right: Option<Box<TreeNode<T>>>,
+        pub key: T, 
+    }
+    impl<T> TreeNode<T> {
+        pub fn new(key: T) -> Self {
+            TreeNode{left:None, right:None, key,}
+        }
+        pub fn left(mut self, node: TreeNode<T>) -> Self {
+            self.left = Some(Box::new(node));
+            self
+        }
+        pub fn right(mut self, node: TreeNode<T>) -> Self {
+            self.right = Some(Box::new(node));
+            self
+        }
+    }
+
+    let node1 = TreeNode::new(1)
+    .left(TreeNode::new(2))
+    .right(TreeNode::new(3));
+
+    println!("node1 = {:?}", node1)
+}
+
+fn concurrency_example1() {
+    // Create a thread
+    // No gurantees when threads will execute -> use 'join' to ensure execution
+    let thread1 = thread::spawn(||{
+        for i in 1..25 {
+            println!("Spawn thread {}", i);
+            thread::sleep(Duration::from_millis(1));
+        }
+    });
+
+    for i in 1..20 {
+        println!("Main thread {}", i);
+        thread::sleep(Duration::from_millis(1));
+    }
+    thread1.join().unwrap();
+}
+
+fn concurrency_example2() {
+    // Arc -> allows multiple workers own the receiver
+    // Mutex -> ensures only one worker gets the job at a time 
+    pub struct Bank {
+        balance: f32,
+    }
+    fn withdraw(the_bank: &Arc<Mutex<Bank>>, amt:f32) {
+        let mut bank_ref = the_bank.lock().unwrap();
+        if bank_ref.balance < 5.00 {
+            println!("Current balance : {}\n Withdraw a smaller amount", bank_ref.balance);
+        } else {
+            bank_ref.balance -= amt;
+            println!("Customer withdrew {} current balance = {}", amt, bank_ref.balance);
+        }
+    }
+
+    fn customer(the_bank: Arc<Mutex<Bank>>){
+        withdraw(&the_bank, 5.00);
+    }
+    
+    // create an instance of the bank with 
+    let bank: Arc<Mutex<Bank>> = Arc::new(Mutex::new(Bank {balance:20.00}));
+    
+    // create a bunch of customer threads
+    let handles = (0..10).map(|_|{
+        let bank_ref = bank.clone();
+        thread::spawn(||{
+            customer(bank_ref);
+        })
+    });
+
+    for handle in handles{
+        handle.join().unwrap();
+    }
+
+    println!("Final balance = {}", bank.lock().unwrap().balance);
+}
+
 
 fn main() {
-    io_error_handling()
+    concurrency_example2()
 }
