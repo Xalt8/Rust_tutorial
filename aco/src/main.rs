@@ -1,5 +1,6 @@
 use std::fs;
 use std::collections::HashMap;
+use rand::Rng;
 
 
 #[derive(Debug)]
@@ -56,15 +57,14 @@ fn get_shortest_path(file_path:&str, city_vec:&Vec<City>) -> Vec<City> {
     return short_path;
 }   
 
-fn get_city(city_name: i32, cities: &Vec<City>) -> Option<&City> {
-    // Takes a city name and returns the city object
-    Some(cities.iter().find(|city| city.name == city_name)?)    
-}
-
+// =======================================================================================================
+// Ant 
+// =======================================================================================================
 
 
 #[derive(Debug)]
 struct Ant<'a> {
+    cities_list: &'a Vec<City>,
     current_node: &'a City,
     visited_nodes: Vec<City>,
     beta: f32,
@@ -73,13 +73,75 @@ struct Ant<'a> {
     tau: f32,
 }
 
-// fn new_ant<'a>(current_node: &'a City, visited_nodes:Vec<City>, beta:f32, q0:f32,rho:f32, tau:f32) -> Ant {
-//     Ant{current_node, visited_nodes, beta, q0,rho, tau}
-// }
+impl<'a> Ant<'a>{
+    fn get_unvisited_cities(self) -> Option<&'a Vec<City>> {
+        if self.visited_nodes.len() > 0 {
+            let unvisisted_nodes:&Vec<City> = &Vec::new();
+            for city in self.cities_list {
+                if self.visited_nodes.iter().find(|x| x.name == city.name).is_none(){
+                    unvisisted_nodes.push(city);
+                }
+            }
+            Some(unvisisted_nodes)
+        } else {
+            None
+        }
+    }
+}
 
-fn spawn_ant<'a>(cities_vec: &Vec<City>) -> Ant {
-    let start_node = get_city(1, cities_vec).expect("Couldn't find city"); // Start from City.name == 1
-    Ant{current_node:start_node, visited_nodes:Vec::new(), beta:2.0, q0:0.9, rho:0.1, tau:0.1}
+
+fn get_city(city_name: i32, cities: &Vec<City>) -> Option<&City> {
+    // Takes a city name and returns the city object
+    Some(cities.iter().find(|city| city.name == city_name)?)    
+}
+
+fn choose_random_start_city(cities_list:&Vec<City>) -> &City {
+    let rand_index = rand::thread_rng().gen_range(1..=cities_list.len());
+    &cities_list[rand_index]
+}
+
+fn spawn_ant<'a>(cities_list: &Vec<City>) -> Ant {
+    // Create an ant object
+    let start_node = choose_random_start_city(&cities_list);
+    Ant{cities_list:cities_list, current_node:start_node, visited_nodes:Vec::new(), beta:2.0, q0:0.9, rho:0.1, tau:0.005}
+}
+
+
+
+// =======================================================================================================
+// Graph 
+// =======================================================================================================
+
+fn get_fully_connected_cities(cities_list:&Vec<City>) -> Vec<(&City, &City)> {
+    // Takes a vec of cities and returns a vec of tuples with every combination
+    // of city as tuples 
+    let mut city_combinations:Vec<(&City, &City)> = Vec::new(); 
+    for city1 in cities_list {
+        for city2 in cities_list {
+            if city1.name != city2.name {
+                city_combinations.push((&city1, &city2))
+            }
+        }
+    }
+    city_combinations
+}
+
+
+fn add_nodes_phermone(from_city:&City, to_city:&City, initial_phermone:f32, graph:&mut HashMap<i32, HashMap<i32, f32>>) {
+    // Creates 2 nodes in a graph and adds a phermone edge between them 
+    graph.entry(from_city.name).or_insert(HashMap::new())
+        .entry(to_city.name).or_insert(initial_phermone);
+}
+
+
+fn create_phermone_graph(cities_list:&Vec<City>, initial_phermone:f32) -> HashMap<i32, HashMap<i32, f32>> {
+    // Create a HashMap with a city name and its neighbours with initial phermone amount 
+    let mut graph: HashMap<i32, HashMap<i32, f32>> = HashMap::new();
+    let city_tuples = get_fully_connected_cities(cities_list);
+    for cities in city_tuples {
+        add_nodes_phermone(cities.0, cities.1, initial_phermone, &mut graph)
+    }
+    graph
 }
 
 fn calculate_distance(city1:&City, city2:&City) -> f32 { 
@@ -87,9 +149,19 @@ fn calculate_distance(city1:&City, city2:&City) -> f32 {
     (((city1.x - city2.x).abs() as f32) + ((city1.y - city2.y).abs() as f32)).powf(2.0)
 }
 
-fn add_nodes_phermone(from_city:&City, to_city:&City, initial_phermone:f32, graph:&mut HashMap<i32, HashMap<i32, f32>>) {
+fn add_nodes_distance(from_city:&City, to_city:&City, graph:&mut HashMap<i32, HashMap<i32, f32>>) {
+    let distance:f32 = calculate_distance(from_city, to_city);
     graph.entry(from_city.name).or_insert(HashMap::new())
-        .entry(to_city.name).or_insert(initial_phermone);
+        .entry(to_city.name).or_insert(distance);
+}
+
+fn create_distance_graph(cities_list:&Vec<City>) -> HashMap<i32, HashMap<i32, f32>> {
+    let mut graph: HashMap<i32, HashMap<i32, f32>> = HashMap::new();
+    let city_tuples = get_fully_connected_cities(cities_list);
+    for cities in city_tuples {
+        add_nodes_distance(cities.0, cities.1, &mut graph)
+    }
+    graph
 }
 
 
@@ -104,9 +176,6 @@ fn main() {
     let found_city = get_city(1, &cities).expect("Couldn't find city");
     println!("found_city = {:?}", found_city);
 
-    let ant3 = spawn_ant(&cities);
-    println!("ant3 = {:?}", ant3);
-
     let dist = calculate_distance(&cities[0], &cities[1]);
     println!("dist: {}", dist);
     
@@ -115,6 +184,25 @@ fn main() {
     add_nodes_phermone(&cities[0], &cities[2], 0.1, &mut phermones); 
     println!("phermones = {:?}", phermones);
     println!("phermones from city0 to city1 = {:?}", phermones[&cities[0].name][&cities[1].name]);
+
+    let phermone_graph = create_phermone_graph(&cities, 0.0005);
+    println!("\nphermone_graph entry-> {:?}", phermone_graph[&1]);
+
+    let distance_graph = create_distance_graph(&cities);
+    println!("\ndistance_graph_entry-> {:?}", distance_graph[&1]);
+    
+    let random_start = choose_random_start_city(&cities);
+    println!("\nrandom_start -> {:?}", random_start);
+
+    let ant3 = spawn_ant(&cities);
+    println!("ant3 = {:?}", ant3);
+
+    ant3.get_unvisited_cities();
+
+    let cits:Vec<i32> = cities.iter().map(|x| x.name).collect();
+    println!("\n{:?}", cits);
+
+
 }
     
     
