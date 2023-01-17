@@ -1,20 +1,23 @@
 use std::fs;
 use std::collections::HashMap;
 use rand::Rng;
+use std::rc::Rc;
 
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 struct City {
     name: i32,
     x: i32,
     y: i32,
 }
 
-impl City {
-    fn print_city(&self) {
-        println!("Name:{}, x:{}, y:{}", self.name, self.x, self.y);
+impl PartialEq for City {
+    // Used to compare 2 cities
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
     }
 }
+
 
 fn parse_coordinates(v: Vec<&str>) -> Vec<(i32, i32)> {
     // From ChatGPT
@@ -61,31 +64,51 @@ fn get_shortest_path(file_path:&str, city_vec:&Vec<City>) -> Vec<City> {
 // Ant 
 // =======================================================================================================
 
-
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Ant<'a> {
     cities_list: &'a Vec<City>,
     current_node: &'a City,
-    visited_nodes: Vec<City>,
+    visited_nodes: Vec<&'a City>,
+    phermone_graph: &'a HashMap<i32, HashMap<i32, f32>>,
+    distance_graph: &'a HashMap<i32, HashMap<i32, f32>>,
     beta: f32,
     q0: f32,
     rho: f32,
     tau: f32,
 }
 
+
 impl<'a> Ant<'a>{
-    fn get_unvisited_cities(self) -> Option<&'a Vec<City>> {
+    fn get_unvisited_cities(&self) -> Option<Vec<City>> {
         if self.visited_nodes.len() > 0 {
-            let unvisisted_nodes:&Vec<City> = &Vec::new();
-            for city in self.cities_list {
-                if self.visited_nodes.iter().find(|x| x.name == city.name).is_none(){
-                    unvisisted_nodes.push(city);
+            let mut unvisisted_nodes:Vec<City> = Vec::new();
+            for city in self.cities_list{
+                if !self.visited_nodes.contains(&city){
+                    unvisisted_nodes.push(*city);
                 }
-            }
+            } 
             Some(unvisisted_nodes)
         } else {
             None
         }
+    }
+
+
+    fn score_node(&self, node_name:i32) -> f32 {
+        // Scores a node based on the current node and node passed 
+        // (self.phermone_graph[&self.current_node.name][&node_name]) * 
+        // f32::powf(1.0/self.distance_graph[&self.current_node.name][&node_name], self.beta as f32)
+        let phermone = self.phermone_graph.get(&self.current_node.name).unwrap().get(&node_name).unwrap();
+        let distance = self.distance_graph.get(&self.current_node.name).unwrap().get(&node_name).unwrap();
+        phermone * f32::powf(1.0/distance, self.beta)
+    }
+
+
+    fn choose_node(&self) -> Vec<City> {
+        // q -> random value between 0,1
+        let q:f32 = rand::thread_rng().gen();
+        let univisted = self.get_unvisited_cities().unwrap();
+        univisted
     }
 }
 
@@ -96,17 +119,26 @@ fn get_city(city_name: i32, cities: &Vec<City>) -> Option<&City> {
 }
 
 fn choose_random_start_city(cities_list:&Vec<City>) -> &City {
-    let rand_index = rand::thread_rng().gen_range(1..=cities_list.len());
+    let rand_index = rand::thread_rng().gen_range(0..=cities_list.len()-1);
     &cities_list[rand_index]
 }
 
-fn spawn_ant<'a>(cities_list: &Vec<City>) -> Ant {
+fn spawn_ant<'a>(
+    cities_list: &'a Vec<City>,
+    phermone_graph:&'a HashMap<i32, HashMap<i32, f32>>,
+    distance_graph:&'a HashMap<i32, HashMap<i32, f32>>) -> Ant<'a> {
     // Create an ant object
     let start_node = choose_random_start_city(&cities_list);
-    Ant{cities_list:cities_list, current_node:start_node, visited_nodes:Vec::new(), beta:2.0, q0:0.9, rho:0.1, tau:0.005}
+    Ant{cities_list:cities_list, 
+        current_node:start_node, 
+        visited_nodes:Vec::new(), 
+        phermone_graph:phermone_graph,
+        distance_graph:distance_graph,
+        beta:2.0, 
+        q0:0.9, 
+        rho:0.1, 
+        tau:0.005}
 }
-
-
 
 // =======================================================================================================
 // Graph 
@@ -126,13 +158,11 @@ fn get_fully_connected_cities(cities_list:&Vec<City>) -> Vec<(&City, &City)> {
     city_combinations
 }
 
-
 fn add_nodes_phermone(from_city:&City, to_city:&City, initial_phermone:f32, graph:&mut HashMap<i32, HashMap<i32, f32>>) {
     // Creates 2 nodes in a graph and adds a phermone edge between them 
     graph.entry(from_city.name).or_insert(HashMap::new())
         .entry(to_city.name).or_insert(initial_phermone);
 }
-
 
 fn create_phermone_graph(cities_list:&Vec<City>, initial_phermone:f32) -> HashMap<i32, HashMap<i32, f32>> {
     // Create a HashMap with a city name and its neighbours with initial phermone amount 
@@ -164,7 +194,6 @@ fn create_distance_graph(cities_list:&Vec<City>) -> HashMap<i32, HashMap<i32, f3
     graph
 }
 
-
 fn main() {
     
     let cities: Vec<City> = cities_from_coordinates("coordinates.txt");
@@ -194,16 +223,38 @@ fn main() {
     let random_start = choose_random_start_city(&cities);
     println!("\nrandom_start -> {:?}", random_start);
 
-    let ant3 = spawn_ant(&cities);
-    println!("ant3 = {:?}", ant3);
+    // // Spawn ant test
+    // let ant3 = spawn_ant(&cities, &phermone_graph, &distance_graph);
+    
+    // // Unvisited test
+    // if let Some(unvisit) = ant3.get_unvisited_cities(){
+    //     println!("\n unvisited cities before -> {:?}", unvisit);
+    // }else {
+    //     println!("\nNo visited cities");
+    // }
 
-    ant3.get_unvisited_cities();
+    // Add some visited cities
+    let mut ant2 = spawn_ant(&cities, &phermone_graph, &distance_graph);
+    if let Some(unvisit) = ant2.get_unvisited_cities(){
+        println!("\nunvisited cities before -> {:?}", unvisit);
+    }else {
+        println!("\nNo visited cities");
+    }
 
-    let cits:Vec<i32> = cities.iter().map(|x| x.name).collect();
-    println!("\n{:?}", cits);
+    ant2.visited_nodes.push(&cities[10]);
+    ant2.visited_nodes.push(&cities[11]);
+    println!("\nant2 visited node = {:?}", ant2.visited_nodes);
 
+    let unvisit = ant2.get_unvisited_cities().unwrap(); 
+    println!("\nunvisit -> {:?}", unvisit);
+    
+    // let pher2:Vec<&f32> = unvisit.iter().map(|x| ant2.distance_graph.get(&ant2.current_node.name).unwrap().get(&x.name).unwrap()).collect();
+    // println!("\npher2 -> {:?}", pher2);
+
+    let test:Vec<i32> = unvisit.iter().map(|x| x.name).collect();
+    // let test_dist = ant2.distance_graph.get(&ant2.current_node.name).unwrap().get(&30).unwrap();
+    // let test_dist:Vec<_> = ant2.distance_graph.get(&ant2.current_node.name).unwrap().values().clone().collect();
+    let test_dist = ant2.score_node(30);
+    println!("\ntest ->{:?}, current_node -> {:?}, test_dist -> {:?}", test, ant2.current_node, test_dist);
 
 }
-    
-    
-
