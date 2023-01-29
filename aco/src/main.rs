@@ -137,6 +137,7 @@ impl<'a> Ant<'a>{
 
     fn get_city(&self, city_name: i32) -> Option<&'a City> {
         // Takes a city name and returns the city object
+        // Used in visit_city()
         self.cities_list.iter().find(|city| city.name == city_name)
     }
 
@@ -150,6 +151,8 @@ impl<'a> Ant<'a>{
 
 
     fn get_pheromone_value(&self, city_name:i32) -> f32 {
+        // Takes a city name and returns the pheromone value from the current city to the provided city
+        // Used in local_pheromone_update()
         let pher_graph = self.pheromone_graph.lock().unwrap();
         let pheromone_value:&f32 = pher_graph.get(&self.current_node.name).unwrap().get(&city_name).unwrap();
         *pheromone_value
@@ -167,35 +170,50 @@ impl<'a> Ant<'a>{
         }
         drop(pher_graph);
     }
+
+    fn new(cities_list: &'a Vec<City>, pheromone_graph: Arc<Mutex<Graph>>, distance_graph:&'a Graph) -> Self {
+        let rand_index = rand::thread_rng().gen_range(0..=cities_list.len()-1);
+        let start_city:&City = &cities_list[rand_index]; 
+        let mut ant = Self{cities_list:cities_list,
+                                current_node:start_city,
+                                visited_nodes:Vec::new(),  
+                                pheromone_graph:pheromone_graph,
+                                distance_graph:distance_graph,
+                                beta:2.0, 
+                                q0:0.9, 
+                                rho:0.1, 
+                                tau:0.005};
+        ant.visit_city(start_city.name);
+        ant
+    }
 } 
 
 
+// fn choose_random_start_city(cities_list:&Vec<City>) -> &City {
+//     let rand_index = rand::thread_rng().gen_range(0..=cities_list.len()-1);
+//     let start_city:&City = &cities_list[rand_index];
+//     start_city
+// }
 
 
-fn choose_random_start_city(cities_list:&Vec<City>) -> &City {
-    let rand_index = rand::thread_rng().gen_range(0..=cities_list.len()-1);
-    let start_city:&City = &cities_list[rand_index];
-    start_city
-}
-
-fn spawn_ant<'a>(
-    cities_list: &'a Vec<City>,
-    pheromone_graph: Arc<Mutex<Graph>>,
-    distance_graph:&'a Graph) -> Ant<'a> {
-    // Create an ant object
-    let start_city: &City = choose_random_start_city(&cities_list);
-    let mut new_ant = Ant{cities_list:cities_list, 
-        current_node:start_city, 
-        visited_nodes:Vec::new(), 
-        pheromone_graph:pheromone_graph,
-        distance_graph:distance_graph,
-        beta:2.0, 
-        q0:0.9, 
-        rho:0.1, 
-        tau:0.005};
-    new_ant.visited_nodes.push(start_city);
-    new_ant
-}
+// fn spawn_ant<'a>(
+//     cities_list: &'a Vec<City>,
+//     pheromone_graph: Arc<Mutex<Graph>>,
+//     distance_graph:&'a Graph) -> Ant<'a> {
+//     // Create an ant object
+//     let start_city: &City = choose_random_start_city(&cities_list);
+//     let mut new_ant = Ant{cities_list:cities_list, 
+//         current_node:start_city, 
+//         visited_nodes:Vec::new(), 
+//         pheromone_graph:pheromone_graph,
+//         distance_graph:distance_graph,
+//         beta:2.0, 
+//         q0:0.9, 
+//         rho:0.1, 
+//         tau:0.005};
+//     new_ant.visited_nodes.push(start_city);
+//     new_ant
+// }
 
 // =======================================================================================================
 // Graph 
@@ -266,21 +284,24 @@ fn main() {
     let distance_graph = create_distance_graph(&cities);
     println!("\ndistance_graph_entry-> {:?}", distance_graph[&1]);
     
-    let random_start = choose_random_start_city(&cities);
-    println!("\nrandom_start -> {:?}", random_start);
+    // let random_start = choose_random_start_city(&cities);
+    // println!("\nrandom_start -> {:?}", random_start);
 
-    let mut ant2 = spawn_ant(&cities, pheromone_graph, &distance_graph);
-    if let Some(unvisit) = ant2.get_unvisited_cities(){
-        println!("\nunvisited cities before -> {:?}", unvisit);
-    }else {
-        println!("\nNo visited cities");
-    }
+    // let mut ant2 = spawn_ant(&cities, pheromone_graph, &distance_graph);
+    // if let Some(unvisit) = ant2.get_unvisited_cities(){
+    //     println!("\nunvisited cities before -> {:?}", unvisit);
+    // }else {
+    //     println!("\nNo visited cities");
+    // }
 
-    ant2.visited_nodes.push(&cities[10]);
-    ant2.visited_nodes.push(&cities[11]);
-    println!("\nant2 visited node = {:?}", ant2.visited_nodes);
+    // ant2.visited_nodes.push(&cities[10]);
+    // ant2.visited_nodes.push(&cities[11]);
+    // println!("\nant2 visited node = {:?}", ant2.visited_nodes);
 
-    let chosen_node = ant2.choose_node();
-    println!("\nchosen_node -> {:?}", chosen_node);
+    // let chosen_node = ant2.choose_node();
+    // println!("\nchosen_node -> {:?}", chosen_node);
+
+    let ant3 = Ant::new(&cities,pheromone_graph, &distance_graph);
+    println!("\nant3.current_node -> {:?}, visited_nodes -> {:?}", ant3.current_node, ant3.visited_nodes);
     
 }
