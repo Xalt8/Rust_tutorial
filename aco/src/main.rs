@@ -71,9 +71,8 @@ fn get_shortest_path(file_path:&str, city_vec:&Vec<City>) -> Vec<City> {
 struct Ant<'a> {
     cities_list: &'a Vec<City>,
     current_node: &'a City,
-    visited_nodes: Vec<&'a City>,
+    visited_nodes: Vec<City>,
     pheromone_graph: Arc<Mutex<Graph>>,
-    // pheromone_graph: &'a HashMap<i32, HashMap<i32, f32>>,
     distance_graph: &'a Graph,
     beta: f32,
     q0: f32,
@@ -83,93 +82,6 @@ struct Ant<'a> {
 
 
 impl<'a> Ant<'a>{
-    fn get_unvisited_cities(&self) -> Option<Vec<City>> {
-        if self.visited_nodes.len() > 0 {
-            let mut unvisisted_nodes:Vec<City> = Vec::new();
-            for city in self.cities_list{
-                if !self.visited_nodes.contains(&city){
-                    unvisisted_nodes.push(*city);
-                }
-            } 
-            Some(unvisisted_nodes)
-        } else {
-            None
-        }
-    }
-
-
-    fn score_node(&self, node_name:i32) -> f32 {
-        // Scores a node based on the current node and node_name passed
-        let pher_graph_clone = Arc::clone(&self.pheromone_graph);
-        let pher_graph = pher_graph_clone.lock().unwrap(); 
-        let phermone = pher_graph.get(&self.current_node.name).unwrap().get(&node_name).unwrap();
-        let distance = self.distance_graph.get(&self.current_node.name).unwrap().get(&node_name).unwrap();
-        phermone * f32::powf(1.0/distance, self.beta)
-    }
-
-
-    fn choose_node(&self) -> i32 {
-        // q -> random value between 0,1
-        let q:f32 = rand::thread_rng().gen();
-        let univisted = self.get_unvisited_cities().unwrap();
-        let scores:Vec<f32> = univisted.iter().map(|city| self.score_node(city.name)).collect(); 
-        let mut max_index:usize = 100;
-        let mut max_score:f32 = std::f32::NEG_INFINITY; 
-        for (i, score) in scores.iter().enumerate(){
-            if score > &max_score {
-                max_score = *score;
-                max_index = i;
-            }
-        }
-        // Use fold instead of for loop
-        // let max3 = scores.iter().enumerate().fold((-10000, 0.0), |max, (ind, &val)| if val > max.1 {(ind, val)} else {max});
-        
-        if q < self.q0 {
-            return univisted[max_index].name;    
-        } else {
-            let sum_scores:f32 = scores.iter().sum();
-            let prob_dist:Vec<f32> = scores.iter().map(|score| score/sum_scores).collect();
-            let city_names = &univisted.into_iter().map(|city| city.name).collect::<Vec<_>>();
-            let choice:Vec<&_> = random_choice().random_choice_f32(&city_names, &prob_dist, 1);
-            return **choice.first().unwrap();
-        }
-    }
-
-    fn get_city(&self, city_name: i32) -> Option<&'a City> {
-        // Takes a city name and returns the city object
-        // Used in visit_city()
-        self.cities_list.iter().find(|city| city.name == city_name)
-    }
-
-
-    fn visit_city(&mut self, city_name:i32) {
-        // Adds the given city_name as the current
-        let city = self.get_city(city_name).unwrap();
-        self.current_node = &city;
-        self.visited_nodes.push(&city);
-    }
-
-
-    fn get_pheromone_value(&self, city_name:i32) -> f32 {
-        // Takes a city name and returns the pheromone value from the current city to the provided city
-        // Used in local_pheromone_update()
-        let pher_graph = self.pheromone_graph.lock().unwrap();
-        let pheromone_value:&f32 = pher_graph.get(&self.current_node.name).unwrap().get(&city_name).unwrap();
-        *pheromone_value
-    }
-
-
-    fn local_pheromone_update(&mut self, city_name:i32) {
-        let mut pher_graph = self.pheromone_graph.lock().unwrap();
-        
-        let old_pheromone:f32 = self.get_pheromone_value(city_name);
-        let new_pheromone:f32 = (1.0 - self.rho) * old_pheromone + (self.rho * self.tau);
-        
-        if let Some(to_city) = pher_graph.get_mut(&self.current_node.name) {
-            to_city.insert(city_name, new_pheromone);
-        }
-        drop(pher_graph);
-    }
 
     fn new(cities_list: &'a Vec<City>, pheromone_graph: Arc<Mutex<Graph>>, distance_graph:&'a Graph) -> Self {
         let rand_index = rand::thread_rng().gen_range(0..=cities_list.len()-1);
@@ -186,34 +98,119 @@ impl<'a> Ant<'a>{
         ant.visit_city(start_city.name);
         ant
     }
+
+
+    fn get_city(&self, city_name: i32) -> Option<&'a City> {
+        // Takes a city name and returns the city object
+        // Used in visit_city()
+        self.cities_list.iter().find(|city| city.name == city_name)
+    }
+
+
+    fn visit_city(&mut self, city_name:i32) {
+        // Adds the given city_name as the current 
+        // and adds it to visited nodes list
+        let city = self.get_city(city_name).unwrap();
+        self.current_node = &city;
+        self.visited_nodes.push(*city);
+        println!("visiting city -> {:?}", city);
+    }
+    
+
+    fn get_unvisited_cities(&self) -> Vec<&City> {
+        // Returns a vec of unvisited cities 
+        // Used in the choose node
+        self.cities_list
+        .iter()
+        .filter(|city| !self.visited_nodes.contains(city))
+        .collect()
+    }
+
+
+    fn score_node(&self, node_name:i32) -> f32 {
+        // Scores a node based on the current node and node_name passed
+        // Used in choose_node()
+        let pher_graph_clone = Arc::clone(&self.pheromone_graph);
+        let pher_graph = pher_graph_clone.lock().unwrap(); 
+        let phermone = pher_graph.get(&self.current_node.name).unwrap().get(&node_name).unwrap();
+        let distance = self.distance_graph.get(&self.current_node.name).unwrap().get(&node_name).unwrap();
+        phermone * f32::powf(1.0/distance, self.beta)
+    }
+
+
+    fn choose_node(&self, univisted:Vec<&City>) -> i32 {
+        // q -> random value between 0,1
+        let q:f32 = rand::thread_rng().gen();
+        // let univisted = self.get_unvisited_cities();
+        let scores:Vec<f32> = univisted.iter().map(|city| self.score_node(city.name)).collect(); 
+        let mut max_index:usize = std::usize::MAX;
+        let mut max_score:f32 = std::f32::NEG_INFINITY; 
+        for (i, score) in scores.iter().enumerate(){
+            if score > &max_score {
+                max_score = *score;
+                max_index = i;
+            }
+        }
+        // Use fold instead of for loop
+        // let max3 = scores.iter().enumerate().fold((-10000, 0.0), |max, (ind, &val)| if val > max.1 {(ind, val)} else {max});
+        
+        if q < self.q0 {
+            println!("exploiting, node -> {:?}", univisted[max_index].name);
+            return univisted[max_index].name;    
+        } else {
+
+            let sum_scores:f32 = scores.iter().sum();
+            let prob_dist:Vec<f32> = scores.iter().map(|score| score/sum_scores).collect();
+            let city_names = &univisted.into_iter().map(|city| city.name).collect::<Vec<_>>();
+            let choice:Vec<&_> = random_choice().random_choice_f32(&city_names, &prob_dist, 1);
+            println!("exploring, node -> {:?}", **choice.first().unwrap());
+            return **choice.first().unwrap();
+        }
+    }
+
+    
+    // fn get_pheromone_value(&self, city_name:i32) -> f32 {
+    //     // Takes a city name and returns the pheromone value from the current city to the provided city
+    //     // Used in local_pheromone_update()
+    //     let pher_graph = self.pheromone_graph.lock().unwrap();
+    //     println!("pher_graph mutex guard in get_pheromone_value()");
+    //     let pheromone_value:&f32 = pher_graph.get(&self.current_node.name).unwrap().get(&city_name).unwrap();
+    //     println!("pheromone_value get_pheromone_value()");
+    //     *pheromone_value
+    // }
+
+
+    fn local_pheromone_update(&mut self, city_name:i32) {
+        let mut pher_graph = self.pheromone_graph.lock().unwrap();
+        println!("pher_graph mutex guard in local_pheromone_update()");
+        // let old_pheromone:f32 = self.get_pheromone_value(city_name);
+        let old_pheromone:f32 = *pher_graph.get(&self.current_node.name).unwrap().get(&city_name).unwrap();
+        println!("old pheromone -> {:?}", old_pheromone);
+        let new_pheromone:f32 = (1.0 - self.rho) * old_pheromone + (self.rho * self.tau);
+        if let Some(to_city) = pher_graph.get_mut(&self.current_node.name) {
+            to_city.insert(city_name, new_pheromone);
+        }
+        
+    }
+
+    
+    fn run_ant_run(&mut self) -> Vec<City>{
+        while self.visited_nodes.len() != self.cities_list.len() {
+            println!("visited_nodes_len -> {:?}", self.visited_nodes.len());
+            let unvisited:Vec<&City> = self.get_unvisited_cities();
+            let chosen_node:i32 = self.choose_node(unvisited);
+            println!("chosen_node -> {:?}", chosen_node);
+            self.local_pheromone_update(chosen_node);
+            self.visit_city(chosen_node);
+            }
+        // Close the loop -> connect first and last city
+        let start_node:i32 = self.visited_nodes.first().unwrap().name;
+        self.local_pheromone_update(start_node);
+        return self.visited_nodes.clone();
+    }
+
 } 
 
-
-// fn choose_random_start_city(cities_list:&Vec<City>) -> &City {
-//     let rand_index = rand::thread_rng().gen_range(0..=cities_list.len()-1);
-//     let start_city:&City = &cities_list[rand_index];
-//     start_city
-// }
-
-
-// fn spawn_ant<'a>(
-//     cities_list: &'a Vec<City>,
-//     pheromone_graph: Arc<Mutex<Graph>>,
-//     distance_graph:&'a Graph) -> Ant<'a> {
-//     // Create an ant object
-//     let start_city: &City = choose_random_start_city(&cities_list);
-//     let mut new_ant = Ant{cities_list:cities_list, 
-//         current_node:start_city, 
-//         visited_nodes:Vec::new(), 
-//         pheromone_graph:pheromone_graph,
-//         distance_graph:distance_graph,
-//         beta:2.0, 
-//         q0:0.9, 
-//         rho:0.1, 
-//         tau:0.005};
-//     new_ant.visited_nodes.push(start_city);
-//     new_ant
-// }
 
 // =======================================================================================================
 // Graph 
@@ -252,11 +249,13 @@ fn calculate_distance(city1:&City, city2:&City) -> f32 {
     (((city1.x - city2.x).abs() as f32) + ((city1.y - city2.y).abs() as f32)).powf(2.0)
 }
 
+
 fn add_nodes_distance(from_city:&City, to_city:&City, graph:&mut HashMap<i32, HashMap<i32, f32>>) {
     let distance:f32 = calculate_distance(from_city, to_city);
     graph.entry(from_city.name).or_insert(HashMap::new())
         .entry(to_city.name).or_insert(distance);
 }
+
 
 fn create_distance_graph(cities_list:&Vec<City>) -> HashMap<i32, HashMap<i32, f32>> {
     let mut graph: HashMap<i32, HashMap<i32, f32>> = HashMap::new();
@@ -284,24 +283,10 @@ fn main() {
     let distance_graph = create_distance_graph(&cities);
     println!("\ndistance_graph_entry-> {:?}", distance_graph[&1]);
     
-    // let random_start = choose_random_start_city(&cities);
-    // println!("\nrandom_start -> {:?}", random_start);
-
-    // let mut ant2 = spawn_ant(&cities, pheromone_graph, &distance_graph);
-    // if let Some(unvisit) = ant2.get_unvisited_cities(){
-    //     println!("\nunvisited cities before -> {:?}", unvisit);
-    // }else {
-    //     println!("\nNo visited cities");
-    // }
-
-    // ant2.visited_nodes.push(&cities[10]);
-    // ant2.visited_nodes.push(&cities[11]);
-    // println!("\nant2 visited node = {:?}", ant2.visited_nodes);
-
-    // let chosen_node = ant2.choose_node();
-    // println!("\nchosen_node -> {:?}", chosen_node);
-
-    let ant3 = Ant::new(&cities,pheromone_graph, &distance_graph);
+    let mut ant3 = Ant::new(&cities,pheromone_graph, &distance_graph);
     println!("\nant3.current_node -> {:?}, visited_nodes -> {:?}", ant3.current_node, ant3.visited_nodes);
-    
+
+    let tour:Vec<City> = ant3.run_ant_run();
+    println!("tour -> {:?}", tour); 
+
 }
