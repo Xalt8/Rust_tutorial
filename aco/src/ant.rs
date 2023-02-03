@@ -6,12 +6,12 @@ use crate::city::City;
 use crate::graph::Graph;
 
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Ant<'a> {
     cities_list: &'a Vec<City>,
     current_node: &'a City,
     visited_nodes: Vec<City>,
-    pheromone_graph: Arc<Mutex<Graph>>,
+    pheromone_graph: &'a Arc<Mutex<Graph>>,
     distance_graph: &'a Graph,
     beta: f32,
     q0: f32,
@@ -22,7 +22,7 @@ pub struct Ant<'a> {
 
 impl<'a> Ant<'a>{
 
-    pub fn new(cities_list: &'a Vec<City>, pheromone_graph: Arc<Mutex<Graph>>, distance_graph:&'a Graph) -> Self {
+    pub fn new(cities_list: &'a Vec<City>, pheromone_graph: &'a Arc<Mutex<Graph>>, distance_graph:&'a Graph) -> Self {
         // Creates a new Ant object by choosing a random start city and adding it to the visited cities list
         let rand_index = rand::thread_rng().gen_range(0..=cities_list.len()-1);
         let start_city:&City = &cities_list[rand_index]; 
@@ -124,7 +124,7 @@ impl<'a> Ant<'a>{
     }
 
     
-    pub fn run_ant_run(&mut self) -> Vec<City>{
+    pub fn goes_on_tour(&mut self) -> Vec<City>{
         // Ant traverses the entire graph adding pheromone to every visited node
         while self.visited_nodes.len() != self.cities_list.len() {
             // println!("visited_nodes_len -> {:?}", self.visited_nodes.len());
