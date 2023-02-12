@@ -1,5 +1,6 @@
 use std::fs;
 
+
 #[derive(Debug, Copy, Clone)]
 pub struct City {
     pub name: i32,
@@ -45,7 +46,7 @@ pub fn get_shortest_path(file_path:&str, city_vec:&Vec<City>) -> Vec<City> {
     let lines: Vec<&str> = short_path_nums.split(" ").collect();
     let vec2: Vec<i32> = lines.into_iter().map(|s| s.trim().parse::<i32>().unwrap()).collect();
     let mut short_path: Vec<City> = Vec::with_capacity(vec2.len());
-    for city_num in vec2{
+    for city_num in vec2 {
         'inner_loop: for city in city_vec.iter().clone(){
             if city_num == city.name {
                 short_path.push(City{name:city.name, x:city.x, y:city.y});

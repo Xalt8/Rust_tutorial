@@ -1,5 +1,6 @@
 use std::sync::{Arc, Mutex};
 use std::collections::HashMap;
+use std::ops::Sub;
 
 use crate::city::City;
 pub type Graph = HashMap<i32, HashMap<i32, f32>>;
@@ -36,7 +37,8 @@ pub fn create_pheromone_graph(cities_list:&Vec<City>, initial_pheromone:f32) -> 
 
 pub fn calculate_distance(city1:&City, city2:&City) -> f32 { 
     // Returns the distance between 2 cities
-    (((city1.x - city2.x).abs() as f32) + ((city1.y - city2.y).abs() as f32)).powf(2.0)
+    (((city1.x - city2.x) as f32).powf(2.0) + 
+     ((city1.y - city2.y) as f32).powf(2.0)).sqrt()
 }
 
 
