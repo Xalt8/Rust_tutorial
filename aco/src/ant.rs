@@ -6,6 +6,18 @@ use crate::city::City;
 use crate::graph::Graph;
 
 
+fn argmax<T: PartialOrd + Copy>(array:Vec<T>) -> usize {
+    // Returns the index of the maximum value in a vec
+    let mut max_index = 0;
+    for (i, val) in array.iter().enumerate(){
+        if val > &array[max_index]{
+            max_index = i
+        }
+    }
+    max_index
+}
+
+
 #[derive(Debug, Clone)]
 pub struct Ant<'a> {
     cities_list: &'a Vec<City>,
@@ -23,9 +35,10 @@ pub struct Ant<'a> {
 impl<'a> Ant<'a>{
 
     pub fn new(cities_list: &'a Vec<City>, pheromone_graph: &'a Arc<Mutex<Graph>>, distance_graph:&'a Graph) -> Self {
-        // Creates a new Ant object by choosing a random start city and adding it to the visited cities list
-        let rand_index = rand::thread_rng().gen_range(0..=cities_list.len()-1);
-        let start_city:&City = &cities_list[rand_index]; 
+        // Creates a new Ant object by choosing the first city in the cities list  
+        // and adding it to the visited cities list
+        let rand_index = rand::thread_rng().gen_range(0..cities_list.len()-1);
+        let start_city:&City = &cities_list[rand_index];
         let mut ant = Self{cities_list:cities_list,
                                 current_node:start_city,
                                 visited_nodes:Vec::new(),  
@@ -78,6 +91,8 @@ impl<'a> Ant<'a>{
     }
 
 
+
+
     fn choose_node(&self, univisted:Vec<&City>) -> i32 {
         // q -> random value between 0,1
         let q:f32 = rand::thread_rng().gen();
@@ -91,7 +106,7 @@ impl<'a> Ant<'a>{
                 max_index = i;
             }
         }
-        // Use fold instead of for loop
+        
         // let max3 = scores.iter().enumerate().fold((-10000, 0.0), |max, (ind, &val)| if val > max.1 {(ind, val)} else {max});
         
         if q < self.q0 {
@@ -113,10 +128,7 @@ impl<'a> Ant<'a>{
         // Applies pheromone update to the edge between the current node and the city passed
         // using the previous pheromone and the local pheromone update formula 
         let mut pher_graph = self.pheromone_graph.lock().unwrap();
-        // println!("pher_graph mutex guard in local_pheromone_update()");
-        // let old_pheromone:f32 = self.get_pheromone_value(city_name);
         let old_pheromone:f32 = *pher_graph.get(&self.current_node.name).unwrap().get(&city_name).unwrap();
-        // println!("old pheromone -> {:?}", old_pheromone);
         let new_pheromone:f32 = (1.0 - self.rho) * old_pheromone + (self.rho * self.tau);
         if let Some(to_city) = pher_graph.get_mut(&self.current_node.name) {
             to_city.insert(city_name, new_pheromone);
@@ -127,10 +139,8 @@ impl<'a> Ant<'a>{
     pub fn goes_on_tour(&mut self) -> Vec<City>{
         // Ant traverses the entire graph adding pheromone to every visited node
         while self.visited_nodes.len() != self.cities_list.len() {
-            // println!("visited_nodes_len -> {:?}", self.visited_nodes.len());
             let unvisited:Vec<&City> = self.get_unvisited_cities();
             let chosen_node:i32 = self.choose_node(unvisited);
-            // println!("chosen_node -> {:?}", chosen_node);
             self.local_pheromone_update(chosen_node);
             self.visit_city(chosen_node);
             }
