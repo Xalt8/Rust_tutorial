@@ -1,7 +1,5 @@
 use std::sync::{Arc, Mutex};
 use std::collections::HashMap;
-use std::ops::Sub;
-
 use crate::city::City;
 pub type Graph = HashMap<i32, HashMap<i32, f32>>;
 

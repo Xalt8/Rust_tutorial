@@ -1,8 +1,9 @@
 use crate::city::City;
 use std::sync::{Arc, Mutex};
 use crate::graph::{Graph, calculate_distance};
-use crate::ant::Ant;
+// use crate::ant::Ant;
 use crate::city;
+use crate::ant2::Ant;
 
 
 pub fn get_tour_city_tuples(tour:& Vec<City>) -> Vec<(&City, &City)> {
@@ -23,6 +24,12 @@ pub fn get_tour_length(tour:Vec<City>) -> f32 {
                           calculate_distance(city1, city2)).sum(); 
     tour_length
 }
+
+// pub fn get_tour_length(tour:Vec<i32>) -> f32 {
+//     // Takes a vec of city names (tour) and returns the 
+//     // distance travelled on that tour
+//     let tour_tuples:Vec<i32> = 
+// }
 
 
 pub struct AntColony<'a> {
@@ -56,18 +63,19 @@ impl <'a> AntColony <'a> {
     }
 
 
-    fn set_global_best(&mut self) {
-        // Calculates the tour length for all the ants and 
-        // sets the best distance and best tour
-        for mut ant in self.ants_list.clone() {
-            let tour:Vec<City> = ant.goes_on_tour();
-            let tour_length:f32 = get_tour_length(tour.clone());
-            if tour_length < self.best_path_distance{
-                self.best_path_distance = tour_length;
-                self.best_path = tour.clone();
-            }
-        }
-    }
+    // fn set_global_best(&mut self) {
+    //     // Calculates the tour length for all the ants and 
+    //     // sets the best distance and best tour
+    //     for mut ant in self.ants_list.clone() {
+    //         let tour:Vec<City> = ant.goes_on_tour();
+    //         let tour_length:f32 = get_tour_length(tour.clone());
+    //         if tour_length < self.best_path_distance{
+    //             self.best_path_distance = tour_length;
+    //             self.best_path = tour.clone();
+    //         }
+    //     }
+    // }
+
 
     
     fn global_update_pheromone(&mut self) {
@@ -91,7 +99,7 @@ impl <'a> AntColony <'a> {
         for i in 0..self.iterations{
             // Ant new() always starts from the firt city!!
             self.ants_list = (0..self.num_ants).map(|_|Ant::new(self.cities_list, self.pheromone_graph, self.distance_graph)).collect();
-            self.set_global_best();
+            // self.set_global_best();
             self.global_update_pheromone();
             println!("Iteration {:?}, best_distance {:?}", i, self.best_path_distance);
             self.ants_list.clear();
