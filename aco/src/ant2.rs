@@ -2,7 +2,8 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use rand::Rng;
 use random_choice::random_choice;
 use crate::city::City;
-use crate::graph::{Graph};
+use crate::graph::{Graph, calculate_distance};
+
 
 fn argmax<T: PartialOrd + Copy>(array:Vec<T>) -> usize {
     // Returns the index of the maximum value in a vec
@@ -25,6 +26,20 @@ pub fn get_tour_name_tuples(tour:&Vec<i32>) -> Vec<(i32, i32)> {
                                                .map(|(a, b)| (*a,*b)).collect();
     tour_city_tuples
 }
+
+
+fn two_opt_swap<T: Clone>(tour: Vec<T>, i: usize, j: usize) -> Vec<T> {
+    // Takes two index values i, k
+    // Takes the start node to i+1 in a tour and adds it to new tour
+    // Takes all nodes from i+1 to k and adds them in reverse order to the new tour
+    // Takes nodes k+1 to the end of the end of the tour and adds them to new tour 
+    let new_tour: Vec<T> = tour[0..=i].iter()
+        .chain(tour[i+1..=j].iter().rev())
+        .chain(tour[j+1..tour.len()].iter())
+        .cloned().collect();
+    new_tour
+}
+
 
 
 #[derive(Debug, Clone)]
@@ -105,4 +120,51 @@ impl<'a> Ant<'a>{
             to_city_map.insert(to_city_name, new_pheromone);
         }
     }
+
+    fn get_city(&self, city_name: i32) -> &City {
+        // Takes a city name and returns the city object
+        self.cities_list.iter().find(|city| city.name == city_name).expect("City not found")
+    }
+
+
+    fn get_tour_length(&self, tour:&Vec<i32>) -> f32 {
+        // Takes a tour and returns the total dsitance travelled in the tour
+        let tour_names_tuples = get_tour_name_tuples(&tour);
+        let tour_city_tuples:Vec<(&City, &City)> = tour_names_tuples.iter()
+                                                   .map(|(city1, city2)| 
+                                                    (self.get_city(*city1), self.get_city(*city2)))
+                                                    .collect();
+        tour_city_tuples.iter().map(|(city1, city2)| calculate_distance(city1, city2)).sum()
+    }
+
+
+    fn two_opt(&mut self, tour:&Vec<i32>) -> Vec<i32> {
+        // Local search heuristic
+        let mut best_tour:Vec<i32> = tour.to_vec();
+        let mut best_tour_dist:f32 = self.get_tour_length(&best_tour); 
+        let mut iterations_since_improvement:usize = 0;
+        let mut improved:bool = true;   
+        while improved && iterations_since_improvement < 10 {
+            improved = false;
+            for i in 0..(tour.len()-1){
+                for j in i + 1..tour.len(){
+                    let new_tour:Vec<i32> = two_opt_swap(tour.to_vec(), i, j);
+                    let new_tour_dist = self.get_tour_length(&new_tour);
+                    if new_tour_dist < best_tour_dist {
+                        best_tour_dist = new_tour_dist;
+                        best_tour = new_tour;
+                        improved = true;
+                        iterations_since_improvement = 0;
+                        break;
+                    }
+                }
+            if improved {
+                break;
+            }
+        }
+        iterations_since_improvement += 1;
+        }
+        best_tour.clone()
+    }
+    
 }

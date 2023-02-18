@@ -1,20 +1,12 @@
 use std::fs;
 
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Hash, Eq, PartialEq, Clone, Copy)]
 pub struct City {
     pub name: i32,
     pub x: i32,
     pub y: i32,
 }
-
-impl PartialEq for City {
-    // Used to compare 2 cities
-    fn eq(&self, other: &Self) -> bool {
-        self.name == other.name
-    }
-}
-
 
 fn parse_coordinates(v: Vec<&str>) -> Vec<(i32, i32)> {
     // From ChatGPT
@@ -40,19 +32,46 @@ pub fn cities_from_coordinates(file_path:&str) -> Vec<City> {
 }
 
 
-pub fn get_shortest_path(file_path:&str, city_vec:&Vec<City>) -> Vec<City> {
+fn get_city<'a>(city_name: i32, cities_list: &'a Vec<City>) -> &'a City {
+    // Takes a city name and returns a City object
+    cities_list
+        .iter()
+        .find(|city| city.name == city_name)
+        .expect("City not found")
+}
+
+
+// pub fn get_shortest_path(file_path:&str, cities_list:&Vec<City>) -> Vec<City> {
+//     // Takes a file with city numbers and returns a vector of Cities
+//     let short_path_nums:String = fs::read_to_string(file_path).expect("Cannot read file");    
+//     let lines: Vec<&str> = short_path_nums.split(" ").collect();
+//     let vec2: Vec<i32> = lines.into_iter().map(|s| s.trim().parse::<i32>().unwrap()).collect();
+//     let mut short_path: Vec<City> = Vec::with_capacity(vec2.len());
+//     for city_num in vec2 {
+//         'inner_loop: for city in cities_list.iter().clone(){
+//             if city_num == city.name {
+//                 short_path.push(City{name:city.name, x:city.x, y:city.y});
+//                 break 'inner_loop
+//             }
+//         }
+//     }
+//     return short_path;
+// }  
+
+
+pub fn get_shortest_path<'a>(file_path:&str, cities_list:&'a Vec<City>) -> Vec<&'a City> {
     // Takes a file with city numbers and returns a vector of Cities
-    let short_path_nums :String = fs::read_to_string(file_path).expect("Cannot read file");    
+    let short_path_nums:String = fs::read_to_string(file_path).expect("Cannot read file");    
     let lines: Vec<&str> = short_path_nums.split(" ").collect();
-    let vec2: Vec<i32> = lines.into_iter().map(|s| s.trim().parse::<i32>().unwrap()).collect();
-    let mut short_path: Vec<City> = Vec::with_capacity(vec2.len());
-    for city_num in vec2 {
-        'inner_loop: for city in city_vec.iter().clone(){
-            if city_num == city.name {
-                short_path.push(City{name:city.name, x:city.x, y:city.y});
-                break 'inner_loop
-            }
-        }
-    }
-    return short_path;
+    let vec2: Vec<i32> = lines
+                        .into_iter()
+                        .map(|s| s.trim()
+                        .parse::<i32>()
+                        .unwrap())
+                        .collect();
+    let mut short_path: Vec<&City> = vec2
+                                     .iter()
+                                     .map(|city_name| get_city(*city_name, &cities_list))
+                                     .collect();
+    short_path
 }  

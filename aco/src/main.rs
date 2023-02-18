@@ -34,9 +34,13 @@ fn main() {
     let cities: Vec<City> = city::cities_from_coordinates("coordinates.txt");
     println!("cities -> {:?}\n", cities);
 
-    let short_path: Vec<City> = city::get_shortest_path("shortest_path.txt", &cities);
+    let short_path: Vec<&City> = city::get_shortest_path("shortest_path.txt", &cities);
     let short_path_clone = short_path.clone();
-    // let short_path_clone2 = short_path.clone();
+    // let short_path2 = city::get_shortest_path2("shortest_path.txt", &cities);
+
+    // println!("\nshort_path2 -> {:?}", short_path2);
+
+
     // println!("short_path -> {:?}\n", short_path);
     let short_distance:f32 = ant_colony::get_tour_length(short_path);
     println!("short_distance -> {:?}\n", short_distance);
@@ -44,8 +48,8 @@ fn main() {
     let pheromone_graph:Arc<Mutex<Graph>> = graph::create_pheromone_graph(&cities, 0.0005);
     let distance_graph:Graph = graph::create_distance_graph(&cities);
     
-    let mut aco = ACO::new(&cities, &pheromone_graph, &distance_graph, 10, 100);
-    aco.optimize(short_path_clone);
+    let mut aco = ACO::new(&cities, &pheromone_graph, &distance_graph, 20, 100);
+    // aco.optimize(short_path_clone);
 
     println!("\nelapsed time -> {} secs", now.elapsed().as_secs());
     // let mut ant1 = ant::Ant::new(&cities, &pheromone_graph, &distance_graph);

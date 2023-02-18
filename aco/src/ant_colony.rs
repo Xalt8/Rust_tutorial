@@ -6,19 +6,30 @@ use crate::city;
 use crate::ant2::Ant;
 
 
-pub fn get_tour_city_tuples(tour:& Vec<City>) -> Vec<(&City, &City)> {
-    // Takes a tour of cities and returns the cities in tuples (City1, City2)
-    // and closes the tour loop by including the last city and first first city 
-    let mut tour_city_tuples:Vec<(&City, &City)> = tour[0..tour.len()-1].iter()
-                                            .zip(tour[1..].iter()).collect();
+// pub fn get_tour_city_tuples(tour:Vec<&City>) -> Vec<(&City, &City)> {
+//     // Takes a tour of cities and returns the cities in tuples (City1, City2)
+//     // and closes the tour loop by including the last city and first first city 
+//     let mut tour_city_tuples:Vec<_> = tour[0..tour.len()-1].iter()
+//                                                    .zip(tour[1..].iter())
+//                                                    .collect();
+//     tour_city_tuples.push((tour.last().unwrap(), tour.first().unwrap()));
+//     tour_city_tuples
+// }
+
+pub fn get_tour_city_tuples<'a>(tour: &'a Vec<City>) -> Vec<(&'a City, &'a City)> {
+    let mut tour_city_tuples: Vec<_> = tour[0..tour.len() - 1]
+        .iter()
+        .zip(tour[1..].iter())
+        .collect();
     tour_city_tuples.push((tour.last().unwrap(), tour.first().unwrap()));
     tour_city_tuples
 }
 
 
-pub fn get_tour_length(tour:Vec<City>) -> f32 {
+
+pub fn get_tour_length(tour:&Vec<City>) -> f32 {
     // Takes a tour and returns the distance covered in the tour  
-    let tour_city_tuples:Vec<(&City, &City)> = get_tour_city_tuples(&tour);
+    let tour_city_tuples:Vec<(&City, &City)> = get_tour_city_tuples(tour);
     let tour_length:f32 = tour_city_tuples.iter()
                           .map(|(city1, city2)| 
                           calculate_distance(city1, city2)).sum(); 
@@ -93,7 +104,7 @@ impl <'a> AntColony <'a> {
 
 
     pub fn optimize(&mut self) {
-        let short_path: Vec<City> = city::get_shortest_path("shortest_path.txt", self.cities_list);
+        let short_path: Vec<&City> = city::get_shortest_path("shortest_path.txt", self.cities_list);
         let shortest_distance:f32 = get_tour_length(short_path);
         
         for i in 0..self.iterations{
