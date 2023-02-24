@@ -9,7 +9,7 @@ pub struct City {
 }
 
 fn parse_coordinates(v: Vec<&str>) -> Vec<(i32, i32)> {
-    // From ChatGPT
+    // Takes a string tuple and returns an int tuple
     v.into_iter().map(|s| {
         let mut coordinates = s.split(',');
         let x = coordinates.next().unwrap().trim().parse::<i32>().unwrap();

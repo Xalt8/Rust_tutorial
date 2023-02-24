@@ -16,18 +16,18 @@ use crate::ant2::Ant;
 //     tour_city_tuples
 // }
 
-pub fn get_tour_city_tuples<'a>(tour: &'a Vec<City>) -> Vec<(&'a City, &'a City)> {
-    let mut tour_city_tuples: Vec<_> = tour[0..tour.len() - 1]
-        .iter()
+pub fn get_tour_city_tuples<'a>(tour: Vec<&City>) -> Vec<(&'a City, &'a City)> {
+    let mut tour_city_tuples: Vec<(&City, &City)> = 
+        tour[0..tour.len() - 1].iter()
         .zip(tour[1..].iter())
+        .map(|(&a,&b)| (a, b))
         .collect();
-    tour_city_tuples.push((tour.last().unwrap(), tour.first().unwrap()));
+    tour_city_tuples.push((&tour.last().unwrap(), &tour.first().unwrap()));
     tour_city_tuples
 }
 
 
-
-pub fn get_tour_length(tour:&Vec<City>) -> f32 {
+pub fn get_tour_length(tour:Vec<&City>) -> f32 {
     // Takes a tour and returns the distance covered in the tour  
     let tour_city_tuples:Vec<(&City, &City)> = get_tour_city_tuples(tour);
     let tour_length:f32 = tour_city_tuples.iter()
@@ -42,23 +42,22 @@ pub fn get_tour_length(tour:&Vec<City>) -> f32 {
 //     let tour_tuples:Vec<i32> = 
 // }
 
-
 pub struct AntColony<'a> {
-    pub best_path: Vec<City>,
+    pub best_path: Vec<&'a City>,
     pub best_path_distance: f32,
     alpha:f32,
     iterations:i32,
     // tau:f32,
     num_ants:i32,
     ants_list:Vec<Ant<'a>>,
-    cities_list: &'a Vec<City>,
+    cities_list: Vec<City>,
     pheromone_graph:&'a Arc<Mutex<Graph>>,
     distance_graph:&'a Graph,
 }
 
 
 impl <'a> AntColony <'a> {
-    pub fn new(cities_list: &'a Vec<City>, pheromone_graph:&'a Arc<Mutex<Graph>>, distance_graph:&'a Graph, num_ants:i32, iterations:i32) -> Self {
+    pub fn new(cities_list: Vec<City>, pheromone_graph:&'a Arc<Mutex<Graph>>, distance_graph:&'a Graph, num_ants:i32, iterations:i32) -> Self {
         let ants:Vec<Ant> = (0..num_ants).map(|_|Ant::new(cities_list, pheromone_graph, distance_graph)).collect();
         Self {best_path:Vec::new(),
              best_path_distance:std::f32::INFINITY,
@@ -92,7 +91,7 @@ impl <'a> AntColony <'a> {
     fn global_update_pheromone(&mut self) {
         // Takes the best tour and applies the global update pheromone 
         let mut pher_graph = self.pheromone_graph.lock().unwrap();
-        let tour_city_tuples:Vec<(&City, &City)> = get_tour_city_tuples(&self.best_path);
+        let tour_city_tuples:Vec<(&City, &City)> = get_tour_city_tuples(self.best_path);
         for (from_city,to_city) in tour_city_tuples {
             let old_pheromone:f32 = *pher_graph.get(&from_city.name).unwrap().get(&to_city.name).unwrap();
             let new_pheromone:f32 = (1.0 - self.alpha) * old_pheromone + self.alpha * f32::powf(self.best_path_distance, -1.0);
@@ -107,7 +106,7 @@ impl <'a> AntColony <'a> {
         let short_path: Vec<&City> = city::get_shortest_path("shortest_path.txt", self.cities_list);
         let shortest_distance:f32 = get_tour_length(short_path);
         
-        for i in 0..self.iterations{
+        for i in 0..self.iterations {
             // Ant new() always starts from the firt city!!
             self.ants_list = (0..self.num_ants).map(|_|Ant::new(self.cities_list, self.pheromone_graph, self.distance_graph)).collect();
             // self.set_global_best();

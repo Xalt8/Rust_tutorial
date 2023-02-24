@@ -2,7 +2,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use rand::Rng;
 use random_choice::random_choice;
 use crate::city::City;
-use crate::graph::{Graph, calculate_distance};
+use crate::graph::{Graph, get_tour_tuples_generic, get_tour_length_generic};
 
 
 fn argmax<T: PartialOrd + Copy>(array:Vec<T>) -> usize {
@@ -14,17 +14,6 @@ fn argmax<T: PartialOrd + Copy>(array:Vec<T>) -> usize {
         }
     }
     max_index
-}
-
-pub fn get_tour_name_tuples(tour:&Vec<i32>) -> Vec<(i32, i32)> {
-    // Takes a tour of city names and returns a vec of tuples   
-    // Also connects the last and first cities
-    let mut tour2 = tour.clone();
-    tour2.rotate_left(1);
-    let tour_city_tuples:Vec<(i32, i32)> = tour.iter()
-                                               .zip(tour2.iter())
-                                               .map(|(a, b)| (*a,*b)).collect();
-    tour_city_tuples
 }
 
 
@@ -39,7 +28,6 @@ fn two_opt_swap<T: Clone>(tour: Vec<T>, i: usize, j: usize) -> Vec<T> {
         .cloned().collect();
     new_tour
 }
-
 
 
 #[derive(Debug, Clone)]
@@ -66,28 +54,28 @@ impl<'a> Ant<'a>{
     }
 
 
-    fn score_node(&self, from_node_name:&i32, to_node_name:&i32) -> f32 {
+    fn score_node(&self, from_node:&City, to_node:&City) -> f32 {
         // Scores a node based on the current node and node_name passed
         // Used in make_tour()
         let pher_graph_clone:Arc<Mutex<Graph>> = Arc::clone(&self.pheromone_graph);
         let pher_graph:MutexGuard<Graph> = pher_graph_clone.lock().unwrap(); 
-        let phermone:&f32 = pher_graph.get(&from_node_name).unwrap().get(&to_node_name).unwrap();
-        let distance:&f32 = self.distance_graph.get(&from_node_name).unwrap().get(&to_node_name).unwrap();
+        let phermone:&f32 = pher_graph.get(&from_node).unwrap().get(&to_node).unwrap();
+        let distance:&f32 = self.distance_graph.get(&from_node).unwrap().get(&to_node).unwrap();
         phermone * f32::powf(1.0/distance, self.beta)
     }
 
 
-    pub fn make_tour(&self) -> Vec<i32> {
-        let mut visited_nodes:Vec<i32> = Vec::with_capacity(self.cities_list.len());
+    pub fn make_tour(&self) -> Vec<City> {
+        let mut visited_nodes:Vec<City> = Vec::with_capacity(self.cities_list.len());
         // First city -> start randomly
-        let city_names:Vec<i32> = self.cities_list.iter().map(|city| city.name).collect();
-        let rand_index = rand::thread_rng().gen_range(0..city_names.len()-1);
-        let start_city_name:i32 = city_names[rand_index];
-        visited_nodes.push(start_city_name);
+        // let city_names:Vec<i32> = self.cities_list.iter().map(|city| city.name).collect();
+        let rand_index = rand::thread_rng().gen_range(0..self.cities_list.len()-1);
+        let start_city:City = self.cities_list[rand_index];
+        visited_nodes.push(start_city);
         // Rest of cities
         while visited_nodes.len() != self.cities_list.len() {
             
-            let mut univisted:Vec<_> = city_names.iter().filter(|city| !visited_nodes.contains(city)).collect();
+            let mut univisted:Vec<_> = self.cities_list.iter().filter(|city| !visited_nodes.contains(city)).collect();
             let scores:Vec<f32> = univisted.iter_mut().map(|city| 
                                   self.score_node(visited_nodes.last().unwrap(),
                                   city)).collect();
@@ -109,47 +97,31 @@ impl<'a> Ant<'a>{
     }
 
 
-    pub fn local_pheromone_update(&self, tour:&Vec<i32>) {
-        let tour_tuples:Vec<(i32, i32)> = get_tour_name_tuples(tour);
+    pub fn local_pheromone_update(&self, tour:&Vec<City>) {
+        let tour_tuples:Vec<(City, City)> = get_tour_tuples_generic(tour.to_vec());
         let mut pher_graph:MutexGuard<Graph> = self.pheromone_graph.lock().unwrap();
-        for (from_city_name, to_city_name) in tour_tuples {
-            let old_pheromone:f32 = *pher_graph.get(&from_city_name).unwrap().get(&to_city_name).unwrap();
+        for (from_city, to_city) in tour_tuples {
+            let old_pheromone:f32 = *pher_graph.get(&from_city).unwrap().get(&to_city).unwrap();
             let new_pheromone:f32 = (1.0 - self.rho) * old_pheromone + (self.rho * self.tau);
-            let to_city_map = pher_graph.get_mut(&from_city_name)
+            let to_city_map = pher_graph.get_mut(&from_city)
                                                       .expect("Couldn't find city in local_pheromone_update()");
-            to_city_map.insert(to_city_name, new_pheromone);
+            to_city_map.insert(to_city, new_pheromone);
         }
     }
 
-    fn get_city(&self, city_name: i32) -> &City {
-        // Takes a city name and returns the city object
-        self.cities_list.iter().find(|city| city.name == city_name).expect("City not found")
-    }
 
-
-    fn get_tour_length(&self, tour:&Vec<i32>) -> f32 {
-        // Takes a tour and returns the total dsitance travelled in the tour
-        let tour_names_tuples = get_tour_name_tuples(&tour);
-        let tour_city_tuples:Vec<(&City, &City)> = tour_names_tuples.iter()
-                                                   .map(|(city1, city2)| 
-                                                    (self.get_city(*city1), self.get_city(*city2)))
-                                                    .collect();
-        tour_city_tuples.iter().map(|(city1, city2)| calculate_distance(city1, city2)).sum()
-    }
-
-
-    fn two_opt(&mut self, tour:&Vec<i32>) -> Vec<i32> {
+    pub fn two_opt(&self, tour:&Vec<City>) -> Vec<City> {
         // Local search heuristic
-        let mut best_tour:Vec<i32> = tour.to_vec();
-        let mut best_tour_dist:f32 = self.get_tour_length(&best_tour); 
+        let mut best_tour:Vec<City> = tour.to_vec();
+        let mut best_tour_dist:f32 = get_tour_length_generic(best_tour.to_vec()); 
         let mut iterations_since_improvement:usize = 0;
         let mut improved:bool = true;   
         while improved && iterations_since_improvement < 10 {
             improved = false;
             for i in 0..(tour.len()-1){
                 for j in i + 1..tour.len(){
-                    let new_tour:Vec<i32> = two_opt_swap(tour.to_vec(), i, j);
-                    let new_tour_dist = self.get_tour_length(&new_tour);
+                    let new_tour:Vec<City> = two_opt_swap(tour.to_vec(), i, j);
+                    let new_tour_dist = get_tour_length_generic(new_tour.to_vec());
                     if new_tour_dist < best_tour_dist {
                         best_tour_dist = new_tour_dist;
                         best_tour = new_tour;
