@@ -1,39 +1,79 @@
 use crate::ant2::{Ant};
 use crate::city::City;
-use crate::graph::{Graph, get_tour_tuples, get_tour_length, get_tour_length_generic};
+use crate::graph::{Graph, get_tour_tuples, get_tour_length_generic};
 use std::sync::{Arc, Mutex};
 use std::thread;
 
-pub struct ACO<'a> {
+
+pub struct ACO  {
     pub best_path: Vec<City>,
     pub best_path_distance: f32,
-    alpha:f32,
-    iterations:i32,
-    // tau:f32,
-    num_ants:i32,
-    // ants_list:Vec<Ant<'a>>,
-    cities_list: &'a Vec<City>,
-    pheromone_graph:&'a Arc<Mutex<Graph>>,
-    distance_graph:&'a Graph,
+    alpha: f32,
+    iterations: i32,
+    num_ants: i32,
+    cities_list: &'static Vec<City>,
+    pheromone_graph: &'static Arc<Mutex<Graph>>,
+    distance_graph: &'static Graph,
 }
 
-impl <'a> ACO <'a>{
-
-    pub fn new(cities_list:&'a Vec<City>, 
-               pheromone_graph:&'a Arc<Mutex<Graph>>, 
-               distance_graph:&'a Graph, 
-               num_ants:i32,
-               iterations:i32) -> Self {
-        Self{best_path:Vec::new(),
-            best_path_distance:std::f32::INFINITY,
+impl ACO {
+    pub fn new(cities_list: &'static Vec<City>, 
+               pheromone_graph: &'static Arc<Mutex<Graph>>, 
+               distance_graph: &'static Graph, 
+               num_ants: i32,
+               iterations: i32) -> Self {
+        Self {
+            best_path: Vec::new(),
+            best_path_distance: std::f32::INFINITY,
             pheromone_graph: pheromone_graph,
             distance_graph: distance_graph,
             num_ants: num_ants,
             cities_list: cities_list,
-            iterations:iterations,
-            alpha:0.1,
+            iterations: iterations,
+            alpha: 0.1,
         }
     }
+
+
+    pub fn optimize_concurrent(&mut self) {
+        let aco = ACO::new(&self.cities_list,
+                                &self.pheromone_graph,
+                                &self.distance_graph,
+                                self.num_ants,
+                                self.iterations);
+
+        let aco_mutex:Arc<Mutex<ACO>> = Arc::new(Mutex::new(aco));
+        for i in 0..self.iterations{
+            println!("Iteration {}, best_dist-> {}" , i, aco_mutex.lock().unwrap().best_path_distance);
+            let mut handles = vec![];
+            for _ in 0..self.num_ants{
+            let aco_mutex:Arc<Mutex<ACO>> = Arc::clone(&aco_mutex);
+            let handle = thread::spawn({
+                move ||{
+                let mut aco_mutex = aco_mutex.lock().unwrap();
+                let ant = Ant::new(&aco_mutex.cities_list, &aco_mutex.pheromone_graph, &aco_mutex.distance_graph);
+                let tour:Vec<City> = ant.make_tour();
+                let tour_clone = tour.clone();
+                ant.local_pheromone_update(&tour);
+                let tour_dist:f32 = get_tour_length_generic(tour);
+                if tour_dist < aco_mutex.best_path_distance{
+                    aco_mutex.best_path_distance = tour_dist;
+                    aco_mutex.best_path = tour_clone;
+                }
+                } 
+            });
+            handles.push(handle);
+            }
+            for handle in handles{
+                handle.join().unwrap();
+            }
+            let mut aco_mutex = aco_mutex.lock().unwrap();
+            aco_mutex.global_update_pheromone();
+
+        }
+    }
+
+    
 
     
     fn global_update_pheromone(&mut self) {
@@ -49,9 +89,7 @@ impl <'a> ACO <'a>{
         }
     }
 
-    
     pub fn optimize(&mut self, short_path:Vec<&City>) {
-
         
         let short_path_dist:f32 = get_tour_length_generic(short_path);
 
@@ -64,34 +102,65 @@ impl <'a> ACO <'a>{
                 break;
             }
             
-            // Concurrency
-            let handle = thread::spawn(move||{
-                for i in 0..self.num_ants {
-                     
-                }
-            });
-            
-            
-            
-                let ants:Vec<Ant> = (0..self.num_ants).map(|_|Ant::new(self.cities_list, self.pheromone_graph, self.distance_graph)).collect();
-                let tours:Vec<Vec<City>> = ants.iter().map(|ant| ant.make_tour()).collect();  
-                for (ant, tour) in ants.iter().zip(tours.iter()) {
-                    let new_tour = ant.two_opt(tour);
-                    ant.local_pheromone_update(&new_tour);
-                }
+            let ants:Vec<Ant> = (0..self.num_ants).map(|_|Ant::new(self.cities_list, self.pheromone_graph, self.distance_graph)).collect();
+            let tours:Vec<Vec<City>> = ants.iter().map(|ant| ant.make_tour()).collect();  
+            for (ant, tour) in ants.iter().zip(tours.iter()) {
+                let new_tour = ant.two_opt(tour);
+                ant.local_pheromone_update(&new_tour);
+            }
 
-                let tour_dists:Vec<f32> = tours.iter().map(|tour| get_tour_length_generic(tour.to_vec())).collect();
-                for (tour, dist) in tours.iter().zip(tour_dists) {
-                    if dist < self.best_path_distance {
-                        self.best_path_distance = dist;
-                        self.best_path = tour.clone();    
-                    } 
-                }
-            
-            
-            handle.join().unwrap();
+            let tour_dists:Vec<f32> = tours.iter().map(|tour| get_tour_length_generic(tour.to_vec())).collect();
+            for (tour, dist) in tours.iter().zip(tour_dists) {
+                if dist < self.best_path_distance {
+                    self.best_path_distance = dist;
+                    self.best_path = tour.clone();    
+                } 
+            }
             self.global_update_pheromone();
         }
+    
     }
 
+
+    // pub fn optimize_concurrent(&mut self) {
+    //     let aco = ACO::new(
+    //                        &self.cities_list,
+    //                        &self.pheromone_graph,
+    //                        &self.distance_graph,
+    //                        self.num_ants,
+    //                        self.iterations);
+        
+    //     let aco_mutex:Arc<Mutex<ACO>> = Arc::new(Mutex::new(aco));
+        
+    //     for j in 0..self.iterations{
+    //         let mut handles = vec![];
+
+    //         for i in 0..self.num_ants{
+    //             let handle = thread::spawn({
+    //                 let aco_mutex = Arc::clone(&aco_mutex);
+    //                 move||{
+    //                     let mut aco = aco_mutex.lock().unwrap();
+    //                     let ant = Ant::new(aco.cities_list, aco.pheromone_graph, aco.distance_graph);
+    //                     let tour:Vec<City> = ant.make_tour();
+    //                     ant.local_pheromone_update(&tour);
+    //                     let tour_dist:f32 = get_tour_length_generic(tour.to_vec());
+    //                     // Set global best
+    //                     if tour_dist < aco.best_path_distance{
+    //                         aco.best_path_distance = tour_dist;
+    //                         aco.best_path = tour;
+    //                     }
+    //                 }
+    //             });
+    //             handles.push(handle);
+    //         }
+    //         for handle in handles{
+    //             handle.join().unwrap();
+    //         }
+    //         self.global_update_pheromone();
+    //     }    
+    // } 
 }
+    
+
+
+   

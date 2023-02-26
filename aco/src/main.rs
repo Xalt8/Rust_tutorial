@@ -3,23 +3,15 @@
 // use rand::Rng;
 // use random_choice::random_choice;
 use std::sync::{Arc, Mutex};
+use once_cell::sync::Lazy;
 
-// City coordinates & paths 
 mod city;
 use city::City;
 
-// Graph -> distance & pheromone
 mod graph;
 use graph::Graph;
-// type Graph = HashMap<i32, HashMap<i32, f32>>;
-
-// mod ant;
-
-// mod ant_colony;
-// use ant_colony::AntColony;
 
 mod ant2;
-
 mod aco;
 use aco::ACO;
 
@@ -27,20 +19,20 @@ use std::time::{Duration, Instant};
 
 
 
+
+
 fn main() {
     let now = Instant::now();
     
-    let cities: Vec<City> = city::cities_from_coordinates("coordinates.txt");
-    println!("cities -> {:?}\n", cities);
+    static CITIES: Lazy<Vec<City>> = Lazy::new(|| city::cities_from_coordinates("coordinates.txt"));
 
-    let short_path: Vec<&City> = city::get_shortest_path("shortest_path.txt", &cities);
+    let short_path: Vec<&City> = city::get_shortest_path("shortest_path.txt", &CITIES);
     
-    let pheromone_graph:Arc<Mutex<Graph>> = graph::create_pheromone_graph(&cities, 0.0005);
-    let distance_graph:Graph = graph::create_distance_graph(&cities);
-    
-    let mut aco = ACO::new(&cities, &pheromone_graph, &distance_graph, 20, 100);
-    
-    aco.optimize(short_path);
+    static pheromone_graph:Lazy<Arc<Mutex<Graph>>> = Lazy::new(|| graph::create_pheromone_graph(&CITIES, 0.0005));
+    static distance_graph:Lazy<Graph> = Lazy::new(|| graph::create_distance_graph(&CITIES));
+
+    let mut aco = ACO::new(&CITIES, &pheromone_graph, &distance_graph, 20, 100);
+    aco.optimize_concurrent();
 
     println!("\nelapsed time -> {} secs", now.elapsed().as_secs());
     

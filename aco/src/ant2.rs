@@ -31,10 +31,10 @@ fn two_opt_swap<T: Clone>(tour: Vec<T>, i: usize, j: usize) -> Vec<T> {
 
 
 #[derive(Debug, Clone)]
-pub struct Ant<'a> {
-    cities_list: &'a Vec<City>,
-    pheromone_graph: &'a Arc<Mutex<Graph>>,
-    distance_graph: &'a Graph,
+pub struct Ant<'a>{
+    cities_list:&'a Vec<City>,
+    pheromone_graph:&'a Arc<Mutex<Graph>>,
+    distance_graph:&'a Graph,
     beta: f32,
     q0: f32,
     rho: f32,
@@ -42,15 +42,15 @@ pub struct Ant<'a> {
 }
 
 
-impl<'a> Ant<'a>{
-    pub fn new(cities_list:&'a Vec<City>, pheromone_graph:&'a Arc<Mutex<Graph>>,distance_graph: &'a Graph) -> Ant<'a> {
-        Ant{cities_list:cities_list,
-                           pheromone_graph:pheromone_graph,
-                           distance_graph:distance_graph,
-                           beta:2.0, 
-                           q0:0.9, 
-                           rho:0.1, 
-                           tau:0.0005}
+impl <'a>Ant<'a>{
+    pub fn new(cities_list:&'a Vec<City>, pheromone_graph:&'a Arc<Mutex<Graph>>,distance_graph: &'a Graph) -> Self {
+        Self{cities_list:cities_list,
+             pheromone_graph:pheromone_graph,
+             distance_graph:distance_graph,
+             beta:2.0, 
+             q0:0.9, 
+             rho:0.1, 
+             tau:0.0005}
     }
 
 
