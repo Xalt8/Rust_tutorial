@@ -47,22 +47,22 @@ impl ACO {
             println!("Iteration {}, best_dist-> {}" , i, aco_mutex.lock().unwrap().best_path_distance);
             let mut handles = vec![];
             for _ in 0..self.num_ants{
-            let aco_mutex:Arc<Mutex<ACO>> = Arc::clone(&aco_mutex);
-            let handle = thread::spawn({
-                move ||{
-                let mut aco_mutex = aco_mutex.lock().unwrap();
-                let ant = Ant::new(&aco_mutex.cities_list, &aco_mutex.pheromone_graph, &aco_mutex.distance_graph);
-                let tour:Vec<City> = ant.make_tour();
-                let tour_clone = tour.clone();
-                ant.local_pheromone_update(&tour);
-                let tour_dist:f32 = get_tour_length_generic(tour);
-                if tour_dist < aco_mutex.best_path_distance{
-                    aco_mutex.best_path_distance = tour_dist;
-                    aco_mutex.best_path = tour_clone;
-                }
-                } 
-            });
-            handles.push(handle);
+                let aco_mutex:Arc<Mutex<ACO>> = Arc::clone(&aco_mutex);
+                let handle = thread::spawn({
+                    move ||{
+                    let mut aco_mutex = aco_mutex.lock().unwrap();
+                    let ant = Ant::new(&aco_mutex.cities_list, &aco_mutex.pheromone_graph, &aco_mutex.distance_graph);
+                    let tour:Vec<City> = ant.make_tour();
+                    let tour2:Vec<City> = ant.two_opt(&tour);
+                    ant.local_pheromone_update(&tour);
+                    let tour_dist:f32 = get_tour_length_generic(tour2.to_vec());
+                    if tour_dist < aco_mutex.best_path_distance{
+                        aco_mutex.best_path_distance = tour_dist;
+                        aco_mutex.best_path = tour2;
+                    }
+                    } 
+                    });
+                handles.push(handle);
             }
             for handle in handles{
                 handle.join().unwrap();
@@ -122,43 +122,6 @@ impl ACO {
     }
 
 
-    // pub fn optimize_concurrent(&mut self) {
-    //     let aco = ACO::new(
-    //                        &self.cities_list,
-    //                        &self.pheromone_graph,
-    //                        &self.distance_graph,
-    //                        self.num_ants,
-    //                        self.iterations);
-        
-    //     let aco_mutex:Arc<Mutex<ACO>> = Arc::new(Mutex::new(aco));
-        
-    //     for j in 0..self.iterations{
-    //         let mut handles = vec![];
-
-    //         for i in 0..self.num_ants{
-    //             let handle = thread::spawn({
-    //                 let aco_mutex = Arc::clone(&aco_mutex);
-    //                 move||{
-    //                     let mut aco = aco_mutex.lock().unwrap();
-    //                     let ant = Ant::new(aco.cities_list, aco.pheromone_graph, aco.distance_graph);
-    //                     let tour:Vec<City> = ant.make_tour();
-    //                     ant.local_pheromone_update(&tour);
-    //                     let tour_dist:f32 = get_tour_length_generic(tour.to_vec());
-    //                     // Set global best
-    //                     if tour_dist < aco.best_path_distance{
-    //                         aco.best_path_distance = tour_dist;
-    //                         aco.best_path = tour;
-    //                     }
-    //                 }
-    //             });
-    //             handles.push(handle);
-    //         }
-    //         for handle in handles{
-    //             handle.join().unwrap();
-    //         }
-    //         self.global_update_pheromone();
-    //     }    
-    // } 
 }
     
 

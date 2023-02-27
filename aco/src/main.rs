@@ -32,7 +32,8 @@ fn main() {
     static distance_graph:Lazy<Graph> = Lazy::new(|| graph::create_distance_graph(&CITIES));
 
     let mut aco = ACO::new(&CITIES, &pheromone_graph, &distance_graph, 20, 100);
-    aco.optimize_concurrent();
+    // aco.optimize_concurrent();
+    aco.optimize(short_path);
 
     println!("\nelapsed time -> {} secs", now.elapsed().as_secs());
     
