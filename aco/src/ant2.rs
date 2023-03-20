@@ -5,7 +5,7 @@ use crate::city::City;
 use crate::graph::{Graph, get_tour_tuples_generic, get_tour_length_generic};
 
 
-fn argmax<T: PartialOrd + Copy>(array:Vec<T>) -> usize {
+pub fn argmax<T: PartialOrd + Copy>(array:Vec<T>) -> usize {
     // Returns the index of the maximum value in a vec
     let mut max_index = 0;
     for (i, val) in array.iter().enumerate(){

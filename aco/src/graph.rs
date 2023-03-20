@@ -63,11 +63,11 @@ pub fn get_tour_tuples(tour:&Vec<City>) -> Vec<(City, City)> {
     tour_city_tuples
 }
 
-pub fn get_tour_length(tour:&Vec<City>) -> f32 {
-    // Takes a tour and returns the total dsitance travelled in the tour
-    let tour_tuples = get_tour_tuples(tour);
-    tour_tuples.iter().map(|(city1, city2)| calculate_distance(city1, city2)).sum()
-}
+// pub fn get_tour_length(tour:&Vec<City>) -> f32 {
+//     // Takes a tour and returns the total dsitance travelled in the tour
+//     let tour_tuples = get_tour_tuples(tour);
+//     tour_tuples.iter().map(|(city1, city2)| calculate_distance(city1, city2)).sum()
+// }
 
 // ===================================================================================================
 
@@ -89,10 +89,10 @@ where
 
 pub fn calculate_distance_generic<T>(city1:T, city2:T) -> f32 
 where 
-    T:Borrow<City>,
+    T: Borrow<City>,
 { 
-    let city1 = city1.borrow();
-    let city2 = city2.borrow();
+    let city1:&City = city1.borrow();
+    let city2:&City = city2.borrow();
     (((city1.x - city2.x) as f32).powf(2.0) + ((city1.y - city2.y) as f32).powf(2.0)).sqrt()
 }
 

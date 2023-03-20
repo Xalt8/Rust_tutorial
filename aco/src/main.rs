@@ -31,9 +31,10 @@ fn main() {
     static pheromone_graph:Lazy<Arc<Mutex<Graph>>> = Lazy::new(|| graph::create_pheromone_graph(&CITIES, 0.0005));
     static distance_graph:Lazy<Graph> = Lazy::new(|| graph::create_distance_graph(&CITIES));
 
-    let mut aco = ACO::new(&CITIES, &pheromone_graph, &distance_graph, 20, 100);
-    // aco.optimize_concurrent();
+    let mut aco = ACO::new(&CITIES, &pheromone_graph, &distance_graph, 10, 100);
     aco.optimize(short_path);
+    // aco.optimize_concurrent();
+    // aco.optimize_concurrent_rayon(short_path);
 
     println!("\nelapsed time -> {} secs", now.elapsed().as_secs());
     

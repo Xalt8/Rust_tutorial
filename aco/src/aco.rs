@@ -1,10 +1,12 @@
-use crate::ant2::{Ant};
+use crate::ant2::{Ant, argmax};
 use crate::city::City;
 use crate::graph::{Graph, get_tour_tuples, get_tour_length_generic};
 use std::sync::{Arc, Mutex};
 use std::thread;
+use rayon::prelude::*;
 
 
+#[derive(Debug, Clone)]
 pub struct ACO  {
     pub best_path: Vec<City>,
     pub best_path_distance: f32,
@@ -36,13 +38,10 @@ impl ACO {
 
 
     pub fn optimize_concurrent(&mut self) {
-        let aco = ACO::new(&self.cities_list,
-                                &self.pheromone_graph,
-                                &self.distance_graph,
-                                self.num_ants,
-                                self.iterations);
+        let aco_mutex: Arc<Mutex<ACO>> = Arc::new(Mutex::new(self.clone()));
 
-        let aco_mutex:Arc<Mutex<ACO>> = Arc::new(Mutex::new(aco));
+        println!("\noptimize_concurrent()\n");
+
         for i in 0..self.iterations{
             println!("Iteration {}, best_dist-> {}" , i, aco_mutex.lock().unwrap().best_path_distance);
             let mut handles = vec![];
@@ -56,12 +55,12 @@ impl ACO {
                     let tour2:Vec<City> = ant.two_opt(&tour);
                     ant.local_pheromone_update(&tour);
                     let tour_dist:f32 = get_tour_length_generic(tour2.to_vec());
-                    if tour_dist < aco_mutex.best_path_distance{
+                    if tour_dist < aco_mutex.best_path_distance {
                         aco_mutex.best_path_distance = tour_dist;
                         aco_mutex.best_path = tour2;
-                    }
+                        }
                     } 
-                    });
+                });
                 handles.push(handle);
             }
             for handle in handles{
@@ -69,11 +68,8 @@ impl ACO {
             }
             let mut aco_mutex = aco_mutex.lock().unwrap();
             aco_mutex.global_update_pheromone();
-
         }
     }
-
-    
 
     
     fn global_update_pheromone(&mut self) {
@@ -92,6 +88,8 @@ impl ACO {
     pub fn optimize(&mut self, short_path:Vec<&City>) {
         
         let short_path_dist:f32 = get_tour_length_generic(short_path);
+
+        println!("\noptimize()\n");
 
         for i in 0..self.iterations {
             
@@ -118,12 +116,50 @@ impl ACO {
             }
             self.global_update_pheromone();
         }
-    
     }
 
 
+
+    pub fn optimize_concurrent_rayon(&mut self, short_path:Vec<&City>) {
+        let short_path_dist:f32 = get_tour_length_generic(short_path);
+        
+        println!("\noptimize_concurrent_rayon()\n");
+        
+        for i in 0..self.iterations {
+            
+            println!("Iteration {:?}, best dist found -> {:.2}, shortest_path_distance -> {:.2}", i, self.best_path_distance, short_path_dist);
+            
+            if short_path_dist == self.best_path_distance {
+                println!("\nShort path found at {} iteration", i);
+                break;
+            }
+            let ants:Vec<Ant> = (0..self.num_ants).map(|_|Ant::new(self.cities_list, self.pheromone_graph, self.distance_graph)).collect();
+            let ant_tours:Vec<(usize, Vec<City>)> = ants.par_iter().enumerate().map(|(index, ant)|{
+                let tour = ant.make_tour();
+                let new_tour = ant.two_opt(&tour);
+                ant.local_pheromone_update(&new_tour);
+                (index, new_tour)
+            }).collect();
+            let tour_dists:Vec<f32> = ant_tours.par_iter()
+                                     .map(|(_, tour)| 
+                                     get_tour_length_generic(tour.to_vec()))
+                                     .collect();
+            let max_index:usize = argmax(tour_dists.clone());
+            if self.best_path_distance > tour_dists[max_index] {
+                // let best_tour = ant_tours[max_index].1.clone();
+                self.best_path_distance = tour_dists[max_index];
+                self.best_path = ant_tours[max_index].1.clone();
+            }
+            self.global_update_pheromone();
+        }
+            
+    }    
 }
-    
+
+
+
+
+
 
 
    
