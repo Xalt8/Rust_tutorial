@@ -14,8 +14,8 @@ class City:
 @dataclass
 class Ant:
     cities_list: field(default_factory=list, init=False)
-    pheromone_graph: field(default_factory=dict, init=False)
-    distance_graph: field(default_factory=dict, init=False)
+    pheromone_graph: field(default_factory=Graph, init=False)
+    distance_graph: field(default_factory=Graph, init=False)
     beta = 2.0
     q0 = 0.9
     rho = 0.1
@@ -35,50 +35,69 @@ class Ant:
             unvisited_cities:list[City] = [city for city in self.cities_list if city not in visited_cities]
             scores = np.array([self.score_city(from_city = visited_cities[-1], to_city = city) 
                                            for city in unvisited_cities], dtype=np.float64)
-            assert(len(unvisited_cities) == len(scores), "scores & unvisited_cities are not the same length")
+            assert len(unvisited_cities) == len(scores), "scores & unvisited_cities are not the same length"
 
-            q = np.random()
+            q = np.random.random()
             if q < self.q0:
                 visited_cities.append(unvisited_cities[np.argmax(scores)])
             else:
                 prob_dist = scores/np.sum(scores)
-                chosen_city = int(np.random.choice(a=unvisited_cities, size=1, p=prob_dist))
-                visited_cities.append(chosen_city)
+                chosen_city_index = int(np.random.choice(a=len(unvisited_cities), size=1, p=prob_dist))
+                visited_cities.append(unvisited_cities[chosen_city_index])
         return visited_cities
     
     
     def local_pheromone_update(self, tour:list[City]) -> None :
-        tour_tuples:list[(City, City)] = [(from_city, to_city) for from_city, to_city in 
-                                          zip(self.cities_list[0:-1], self.cities_list[1:])]
-        tour_tuples.append((self.cities_list[-1], self.cities_list[0])) # Close the loop
+        tour_tuples:list[(City, City)] = get_tour_tuples(tour)
         for from_city, to_city in tour_tuples:
             self.pheromone_graph[from_city.name][to_city.name] = \
-            (1 - self.rho) * self.pheromone_graph[from_city.name][from_city.name] + (self.rho * self.tau)
+            (1 - self.rho) * self.pheromone_graph[from_city.name][to_city.name] + (self.rho * self.tau)
+
 
 
 @dataclass
 class ACO:
-    best_path: list[City]
-    best_path_distance: float
-    alpha: float
-    iteationas: int
-    num_ants: int
     cities_list: list[City]
     pheromone_graph: Graph
     distance_graph: Graph
+    iterations: int
+    num_ants: int
+    best_path:list[City] = field(default_factory=list)
+    best_path_distance:float = np.Infinity
+    alpha: float = 0.1
 
-    def optimize(self) :
-        ants = [Ant(cities_list=self.cities_list, pheromone_graph=self.pheromone_graph, distance_graph=self.distance_graph) 
-                for _ in range(self.num_ants)]
-        tours:list[list[City]] = [ant.make_tour() for ant in ants]
-        for ant, tour in zip(ants, tours):
-            ant.local_pheromone_update(tour)
+
+    def global_update_pheromone(self) -> None:
+        """ Applies global pheromone update rule to pheromone graph"""
+        tour_tuples:list[(City, City)] = get_tour_tuples(self.best_path)
+        for from_city, to_city in tour_tuples:
+            self.pheromone_graph[from_city.name][to_city.name] = \
+            (1-self.alpha) * self.pheromone_graph[from_city.name][to_city.name] + self.alpha * (self.best_path_distance ** -1)
+
+
+    def optimize(self, shorest_path:list[City]):
         
+        for i in range(self.iterations):
+            print(f"Iteration -> {i}, best distance found -> {round(self.best_path_distance,2)}")
 
-with open("coordinates.txt", 'r') as f:
-    lines = [line.strip().split(", ") for line in f]
-    
-CITIES = [City(str(name), int(x), int(y)) for name, (x, y) in enumerate(lines, start=1) ]
+            shortest_path_distance:float = get_tour_length(shorest_path)
+            if round(shortest_path_distance,2) == round(self.best_path_distance,2):
+                print(f"\nShortest path found at {i} iteration")
+                break
+
+            ants = [Ant(cities_list=self.cities_list, pheromone_graph=self.pheromone_graph, distance_graph=self.distance_graph) 
+                    for _ in range(self.num_ants)]
+            tours:list[list[City]] = [ant.make_tour() for ant in ants]
+            for ant, tour in zip(ants, tours):
+                ant.local_pheromone_update(tour)
+            
+            tour_distances:list[float] = [get_tour_length(tour) for tour in tours]
+            for tour, tour_distance in zip(tours, tour_distances):
+                if tour_distance < self.best_path_distance:
+                    self.best_path_distance = tour_distance
+                    self.best_path = tour
+            
+            self.global_update_pheromone()
 
 
 def get_connected_cities(city_name:str, cities_list:list[City]) -> list[City] :
@@ -112,22 +131,40 @@ def get_distance_graph(cities_list:list) -> Graph:
     return distance_graph
 
 
+def get_tour_tuples(tour:list[City]) -> list[(City, City)]:
+    """ Takes a tour and returns a list of city tuples (from_city, to_city)
+        including the last and first cities """
+    
+    return [(from_city, to_city) for (from_city, to_city) in zip(tour, tour[1:] + tour[:1])]
+
+
+def get_tour_length(tour:list[City]) -> float:
+    """ Takes a list of Cities and returns the distance travelled for that tour"""
+    tour_tuples:list[(City, City)] = get_tour_tuples(tour)
+    tour_length:float = sum([calculate_distance(from_city, to_city) for from_city, to_city in tour_tuples])
+    return tour_length
+
 
 if __name__ == '__main__':
-    print(f"cities -> {CITIES}\n")
+    with open("coordinates.txt", 'r') as f:
+        lines = [line.strip().split(", ") for line in f]
+    CITIES = [City(str(name), int(x), int(y)) for name, (x, y) in enumerate(iterable=lines, start=1)]
+    print(f"\nintial_cities_distance -> {get_tour_length(CITIES)}\n")
+
+    with open("shortest_path.txt", 'r', encoding='utf8') as f:
+        shortest_lines = f.readline()
+        
+    SHORT_PATH_CITIES = [City(name=city_name, x=city.x, y=city.y) for city_name in shortest_lines.split(" ")
+                           for city in CITIES 
+                           if city.name == city_name]
+    print(f"shortest_path_distance -> {get_tour_length(SHORT_PATH_CITIES)}\n")
+    
     pheromone_graph = get_pheromone_graph(cities_list=CITIES, initial_pheromone=0.0005)
-    print(f"\npheromone_graph 1 -> {pheromone_graph['1']}\n")
     distance_graph = get_distance_graph(CITIES)
-    print(f"distance_graph 1 -> {distance_graph['1']}\n")
-
-    tour_tuples:list[(City, City)] = [(from_city, to_city) for from_city, to_city in 
-                                          zip(CITIES[0:-1], CITIES[1:])]
-    tour_tuples.append((CITIES[-1], CITIES[0])) # Close the loop
-
-    print(tour_tuples)
-
-    tour_tuples2 = [(from_city, to_city) for from_city, to_city in zip(CITIES, CITIES[1:] + CITIES[:1])]
-
-    print(tour_tuples == tour_tuples2)
-
-    print([city.name for city in CITIES[:1]])
+    
+    aco = ACO(cities_list=CITIES, pheromone_graph=pheromone_graph, distance_graph=distance_graph, iterations=200, num_ants=10)
+    aco.optimize(SHORT_PATH_CITIES)
+    
+    
+    
+    
