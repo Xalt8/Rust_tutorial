@@ -1,14 +1,23 @@
 from dataclasses import dataclass, field
 import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.lines as mlines
+import time
+import cProfile
+
 
 cityName = str
 Graph = dict[cityName, dict[cityName, float]]
 
-@dataclass
+
+@dataclass(frozen=True)
 class City:
     name: str
     x: int
     y: int
+
+    def __hash__(self):
+        return hash((self.name, self.x, self.y))
 
 
 @dataclass
@@ -32,7 +41,8 @@ class Ant:
         start_city = self.cities_list[np.random.randint(0, len(self.cities_list)-1)]
         visited_cities.append(start_city)
         while len(visited_cities) != len(self.cities_list):
-            unvisited_cities:list[City] = [city for city in self.cities_list if city not in visited_cities]
+            # unvisited_cities:list[City] = [city for city in self.cities_list if city not in visited_cities]
+            unvisited_cities = list(set(self.cities_list) - set(visited_cities))
             scores = np.array([self.score_city(from_city = visited_cities[-1], to_city = city) 
                                            for city in unvisited_cities], dtype=np.float64)
             assert len(unvisited_cities) == len(scores), "scores & unvisited_cities are not the same length"
@@ -54,6 +64,10 @@ class Ant:
             (1 - self.rho) * self.pheromone_graph[from_city.name][to_city.name] + (self.rho * self.tau)
 
 
+def make_tour_wrapper(ant:Ant) -> list[City]:
+    """ Helper function -> concurrent.futures does not allow
+        pickling of Ant object """
+    return ant.make_tour()
 
 @dataclass
 class ACO:
@@ -145,7 +159,41 @@ def get_tour_length(tour:list[City]) -> float:
     return tour_length
 
 
+def plot_tour(tour:list[City], short_path:list[City]) -> plt.Axes:
+    
+    _, ax = plt.subplots(1,1, figsize=(8,5))
+    
+    # Plot the cities
+    for city in tour:
+        ax.text(city.x, city.y, s=city.name, bbox=dict(boxstyle="circle", facecolor='lightblue', edgecolor='blue'))
+    
+    # Plot the shortest path
+    short_path_line_format = {'color':'red', 'linestyle':'-', 'alpha':0.2, 'linewidth':6, 'label':"Shortest path"}
+    for from_city, to_city in get_tour_tuples(short_path):
+        ax.plot([from_city.x, to_city.x], [from_city.y, to_city.y], **short_path_line_format)
+    
+    # Plot the tour -> best path found
+    best_path_line_format = {'color':'blue', 'linestyle':'--', 'label':'Best path found'}
+    for from_city, to_city in get_tour_tuples(tour):
+        ax.plot([from_city.x, to_city.x], [from_city.y, to_city.y], **best_path_line_format)
+    
+    short_path_legend_handle = mlines.Line2D([], [], **short_path_line_format)
+    tour_path_legend_handle = mlines.Line2D([], [], **best_path_line_format)
+
+    ax.text(1, 10, f"Shortest path distance: {get_tour_length(short_path):.2f}\nBest path distance: {get_tour_length(tour):.2f}", 
+            verticalalignment='top', bbox={'boxstyle':'round', 'facecolor':'wheat', 'alpha':0.4})
+
+    plt.xlim(0, max([city.x for city in tour]) +10)
+    plt.ylim(0, max([city.y for city in tour]) +10)
+    plt.legend(handles=[short_path_legend_handle, tour_path_legend_handle])
+    plt.title("ACO")
+    plt.show()
+
+
 if __name__ == '__main__':
+
+    start_time = time.perf_counter()
+
     with open("coordinates.txt", 'r') as f:
         lines = [line.strip().split(", ") for line in f]
     CITIES = [City(str(name), int(x), int(y)) for name, (x, y) in enumerate(iterable=lines, start=1)]
@@ -162,9 +210,14 @@ if __name__ == '__main__':
     pheromone_graph = get_pheromone_graph(cities_list=CITIES, initial_pheromone=0.0005)
     distance_graph = get_distance_graph(CITIES)
     
-    aco = ACO(cities_list=CITIES, pheromone_graph=pheromone_graph, distance_graph=distance_graph, iterations=200, num_ants=10)
+    aco = ACO(cities_list=CITIES, pheromone_graph=pheromone_graph, distance_graph=distance_graph, iterations=200, num_ants=20)
     aco.optimize(SHORT_PATH_CITIES)
     
+    end_time = time.perf_counter()
+    print(f'\nTime taken: {end_time-start_time:.2f} seconds\n')
+    plot_tour(tour=aco.best_path, short_path=SHORT_PATH_CITIES)
+
+    # cProfile.run('aco.optimize(SHORT_PATH_CITIES)', sort='cumtime')
     
     
     

@@ -1,6 +1,7 @@
 
 from math import sqrt
 import numpy as np
+import matplotlib.pyplot as plt
 
 
 def calculate_distance(coords1:tuple, coords2:tuple) -> float:
@@ -42,9 +43,26 @@ def k_means_clustering(k:int, cities:list) -> list:
     return clusters
 
 
+def plot_tour(tour:list) -> plt.Axes:
+    
+    fig = plt.figure(figsize=(8,5))
+    for i, city in enumerate(tour,1):
+        plt.text(x=city[0], y=city[1], s=str(i), color='red', size=10,
+                 bbox=dict(boxstyle="circle", facecolor='lightblue', edgecolor='blue'))
+    
+    for from_city, to_city in zip(tour, tour[1:] + tour[:1]):
+        plt.plot([from_city[0], to_city[0]], [from_city[1], to_city[1]], color='green', linestyle='-')
+
+    short_path = [(1,1), (2,1), (4,3), (5,4), (5,6)]
+    for from_city, to_city in zip(short_path, short_path[1:] + short_path[:1]):
+        plt.plot([from_city[0], to_city[0]], [from_city[1], to_city[1]], color='red', linestyle='-', alpha=0.2, linewidth=6)
+
+    plt.tight_layout()
+    plt.show()
 
 if __name__ == "__main__":
-    cities = [(1,1), (2,1), (4,3), (5,4)]
+    cities = [(1,1), (5,6), (2,1), (4,3), (5,4)]
     print(f"\ncities -> {cities}\n")
     clusters = k_means_clustering(k=2, cities=cities)
     print(f"clusters -> {clusters}")
+    plot_tour(cities)
