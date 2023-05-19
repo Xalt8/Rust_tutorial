@@ -2,6 +2,9 @@
 from math import sqrt
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
+
+import ant
 
 
 def calculate_distance(coords1:tuple, coords2:tuple) -> float:
@@ -43,26 +46,65 @@ def k_means_clustering(k:int, cities:list) -> list:
     return clusters
 
 
-def plot_tour(tour:list) -> plt.Axes:
+def get_connected_cities_indicies(city_index:int, cities:list[ant.City]) -> np.ndarray:
+    assert city_index < len(cities), "The city_index is out of bounds"
+    city_indicies = np.arange(len(cities), dtype=np.int32)
+    return city_indicies[city_indicies != city_index]
+
+
+def plot_graph(cities:list, pher_graph:np.ndarray) -> plt.Axes:
     
     fig = plt.figure(figsize=(8,5))
-    for i, city in enumerate(tour,1):
-        plt.text(x=city[0], y=city[1], s=str(i), color='red', size=10,
-                 bbox=dict(boxstyle="circle", facecolor='lightblue', edgecolor='blue'))
+    ax = plt.axes(xlim=(0, max([city.x for city in cities]) +10), ylim= (0, max([city.y for city in cities]) +10))
     
-    for from_city, to_city in zip(tour, tour[1:] + tour[:1]):
-        plt.plot([from_city[0], to_city[0]], [from_city[1], to_city[1]], color='green', linestyle='-')
+    def animate(i):
 
-    short_path = [(1,1), (2,1), (4,3), (5,4), (5,6)]
-    for from_city, to_city in zip(short_path, short_path[1:] + short_path[:1]):
-        plt.plot([from_city[0], to_city[0]], [from_city[1], to_city[1]], color='red', linestyle='-', alpha=0.2, linewidth=6)
+        nonlocal pher_graph
 
+        rand_graph = np.random.rand(*pher_graph.shape)
+        np.fill_diagonal(rand_graph,0)
+        pher_graph += rand_graph
+        
+        ax.cla()
+        for city in cities:
+            ax.text(x=city.x, y=city.y, s=city.name, color='red', size=10,
+                bbox=dict(boxstyle="circle", facecolor='lightblue', edgecolor='blue'))
+
+        for from_city_idx, _ in enumerate(cities):
+            for to_city_idx in get_connected_cities_indicies(city_index=from_city_idx, cities=cities):
+                ax.plot([cities[from_city_idx].x, cities[to_city_idx].x], 
+                         [cities[from_city_idx].y, cities[to_city_idx].y], 
+                         linewidth=pher_graph[from_city_idx][to_city_idx], color='red', alpha=0.4)
+
+    ani = FuncAnimation(fig=fig, func=animate, interval=1000)
+    
     plt.tight_layout()
     plt.show()
 
 if __name__ == "__main__":
-    cities = [(1,1), (5,6), (2,1), (4,3), (5,4)]
-    print(f"\ncities -> {cities}\n")
-    clusters = k_means_clustering(k=2, cities=cities)
-    print(f"clusters -> {clusters}")
-    plot_tour(cities)
+    # cities = [(1,1), (5,6), (2,1), (4,3), (5,4)]
+    # print(f"\ncities -> {cities}\n")
+    # clusters = k_means_clustering(k=2, cities=cities)
+    # print(f"clusters -> {clusters}")
+    
+    city1 = ant.City(name='1', x=5, y=10)
+    city2 = ant.City(name='2', x=5, y=25)
+    city3 = ant.City(name='3', x=15, y=30)
+    city4 = ant.City(name='4', x=10, y=35)
+
+    cities = [city1, city2, city3, city4]
+    pher_graph = np.zeros(shape=(len(cities), len(cities)))
+
+    for from_city_index, from_city in enumerate(cities):
+        for to_city_index, to_city in enumerate(cities):
+             if from_city != to_city:
+                 pher_graph[from_city_index][to_city_index] = 0.5
+
+    print(pher_graph)
+    
+    # plot_graph(cities=cities, pher_graph=pher_graph)
+
+    
+
+
+

@@ -64,11 +64,6 @@ class Ant:
             (1 - self.rho) * self.pheromone_graph[from_city.name][to_city.name] + (self.rho * self.tau)
 
 
-def make_tour_wrapper(ant:Ant) -> list[City]:
-    """ Helper function -> concurrent.futures does not allow
-        pickling of Ant object """
-    return ant.make_tour()
-
 @dataclass
 class ACO:
     cities_list: list[City]

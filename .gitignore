@@ -6,3 +6,5 @@ aco/shortest_path.txt
 .vscode/launch.json
 env
 .gitignore
+aco/__pycache__/ant.cpython-310.pyc
+.gitignore
