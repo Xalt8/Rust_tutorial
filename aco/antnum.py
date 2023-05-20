@@ -1,6 +1,7 @@
 import numpy as np
 from ant import City, calculate_distance
-
+import time
+import cProfile
 
 def score_city(from_city_idx:int, 
                to_city_idx:int, 
@@ -11,23 +12,24 @@ def score_city(from_city_idx:int,
 
 
 def make_tour(cities_list:list[City], dist_graph:np.ndarray, pher_graph:np.ndarray, q0=0.90) -> np.ndarray:
-    # tour = np.array([], dtype=np.int32)
-    tour = np.full(shape=len(cities_list), fill_value=np.nan, dtype=np.int32)
+    tour = np.full(shape=len(cities_list), fill_value=999999, dtype=np.int32)
     cities_idx = np.arange(len(cities_list))
     start_city_indx = np.random.choice(cities_idx)
-    tour = np.append(tour, start_city_indx)
-    while tour.size != cities_idx.size:
-        unvisited_idx = np.setdiff1d(cities_idx, tour)
-        scores = score_city(from_city_idx = tour[-1], to_city_idx = unvisited_idx, 
+    tour[0] = start_city_indx
+    for i in np.arange(start=1, stop=tour.size):
+        # unvisited_idx = np.setdiff1d(cities_idx, tour)
+        unvisited_idx = np.array(list((set(cities_idx) - set(tour))))
+        scores = score_city(from_city_idx = tour[i-1], to_city_idx = unvisited_idx, 
                             distance_graph = dist_graph, pheromone_graph = pher_graph)
         assert unvisited_idx.size == scores.size, "unvisited_idx and scores are not the same size"
 
         if np.random.random() < q0:
-            tour = np.append(tour, unvisited_idx[np.argmax(scores)])
+            tour[i] = unvisited_idx[np.argmax(scores)]
         else:
             prob_dist = scores/np.sum(scores)
             chosen_city_index = int(np.random.choice(a=unvisited_idx, size=1, p=prob_dist))
-            tour = np.append(tour, chosen_city_index)
+            tour[i] = chosen_city_index
+    # assert np.setdiff1d(tour, cities_idx).size == 0, "tour and city indices are different"
     return tour
 
 
@@ -62,21 +64,33 @@ def get_tour_distance(tour:np.ndarray, cities_list:list[City]) -> float:
                    for from_city_idx, to_city_idx in zip(tour, np.roll(a=tour, shift=-1))])
 
 
-def optimize(cities_list:list[City], 
+def optimize(cities_list:list[City],
+             shortest_path:np.ndarray, 
              pher_graph:np.ndarray, 
              dist_graph:np.ndarray,
              iterations:int,
-             num_ants:int) -> tuple:
+             num_ants:int) -> np.ndarray:
 
     best_tour = np.full(shape=len(cities_list), fill_value=np.nan)
     best_tour_distance:float = np.Infinity
 
-    # for i in range(iterations):
-    tours = np.array([make_tour(cities_list=cities_list, dist_graph=dist_graph, pher_graph=pher_graph)
-                      for _ in range(num_ants)])
-    for tour in tours:
-        pher_graph = local_pheromone_update(tour= tour, pher_graph= pher_graph, cities_list= cities_list)
+    for i in range(iterations):
+        print(f"Iteration -> {i}, best_tour_distance -> {best_tour_distance:.2f}")
 
+        if round(best_tour_distance,2) == round(get_tour_distance(tour=shortest_path, cities_list=cities_list),2):
+            print(f"\nFound shortest path at {i} iteration")
+            break
+
+        tours = np.array([make_tour(cities_list=cities_list, dist_graph=dist_graph, pher_graph=pher_graph)
+                        for _ in range(num_ants)])
+        for tour in tours:
+            pher_graph = local_pheromone_update(tour= tour, pher_graph= pher_graph, cities_list= cities_list)
+            tour_distance = get_tour_distance(tour=tour, cities_list=cities_list)
+            if tour_distance < best_tour_distance:
+                best_tour = tour
+                best_tour_distance = tour_distance
+    
+    return best_tour
 
 
 def get_connected_cities_indicies(city_index:int, cities:list[City]) -> np.ndarray:
@@ -106,24 +120,37 @@ def get_distance_graph(cities_list:list) -> np.ndarray:
     return distance_graph
 
 
-if __name__ == "__main__":
+def main():
     with open("coordinates.txt", 'r') as f:
         lines = [line.strip().split(", ") for line in f]
     CITIES = [City(str(name), int(x), int(y)) for name, (x, y) in enumerate(iterable=lines, start=1)]
 
     with open("shortest_path.txt", 'r', encoding='utf8') as f:
         shortest_lines = f.readline()
-    SHORT_PATH_CITIES = [City(name=city_name, x=city.x, y=city.y) for city_name in shortest_lines.split(" ")
-                            for city in CITIES 
-                            if city.name == city_name]
-    
+    # SHORT_PATH_CITIES = [City(name=city_name, x=city.x, y=city.y) for city_name in shortest_lines.split(" ")
+    #                         for city in CITIES 
+    #                         if city.name == city_name]
+    short_tour = np.array([int(line)-1 for line in shortest_lines.split(" ")], dtype=np.int32)
+
     pheromone_graph = get_pheromone_graph(cities_list=CITIES, initial_pheromone=0.0005)
     distance_graph = get_distance_graph(cities_list=CITIES)
 
-    tour = make_tour(cities_list=CITIES, dist_graph=distance_graph, pher_graph=pheromone_graph)
+    best_tour = optimize(cities_list=CITIES, 
+                         shortest_path=short_tour, 
+                         pher_graph=pheromone_graph, 
+                         dist_graph=distance_graph, 
+                         iterations=200, 
+                         num_ants=10)
+
+
+if __name__ == "__main__":
+
+    start_time = time.perf_counter()
+
+    main()
+
+    end_time = time.perf_counter()
+    print(f'\nTime taken: {end_time-start_time:.2f} seconds\n')
     
-    # tours = optimize(cities_list=CITIES, pher_graph=pheromone_graph, dist_graph=distance_graph, iterations=10, num_ants=10)
-    
-    # print(get_tour_distance(tour, SHORT_PATH_CITIES))
-    short_tour = np.array([int(line)-1 for line in shortest_lines.split(" ")], dtype=np.int32)
+    # cProfile.run('main()', sort='cumtime')
     

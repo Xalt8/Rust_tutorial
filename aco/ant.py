@@ -205,7 +205,7 @@ if __name__ == '__main__':
     pheromone_graph = get_pheromone_graph(cities_list=CITIES, initial_pheromone=0.0005)
     distance_graph = get_distance_graph(CITIES)
     
-    aco = ACO(cities_list=CITIES, pheromone_graph=pheromone_graph, distance_graph=distance_graph, iterations=200, num_ants=20)
+    aco = ACO(cities_list=CITIES, pheromone_graph=pheromone_graph, distance_graph=distance_graph, iterations=200, num_ants=10)
     aco.optimize(SHORT_PATH_CITIES)
     
     end_time = time.perf_counter()
