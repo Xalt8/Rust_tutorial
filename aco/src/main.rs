@@ -8,15 +8,11 @@ use once_cell::sync::Lazy;
 mod city;
 use city::City;
 
-mod graph;
-use graph::Graph;
+use std::fs;
+use std::time::{Instant};
 
-mod ant2;
-mod aco;
-use aco::ACO;
-
-use std::time::{Duration, Instant};
-
+mod ant3;
+use crate::ant3::{cities_from_coordinates3, ACO3, get_short_path_indicies, get_pheromone_graph, get_distance_graph};
 
 
 
@@ -24,20 +20,18 @@ use std::time::{Duration, Instant};
 fn main() {
     let now = Instant::now();
     
-    static CITIES: Lazy<Vec<City>> = Lazy::new(|| city::cities_from_coordinates("coordinates.txt"));
-
-    let short_path: Vec<&City> = city::get_shortest_path("shortest_path.txt", &CITIES);
-    
-    static pheromone_graph:Lazy<Arc<Mutex<Graph>>> = Lazy::new(|| graph::create_pheromone_graph(&CITIES, 0.0005));
-    static distance_graph:Lazy<Graph> = Lazy::new(|| graph::create_distance_graph(&CITIES));
-
-    let mut aco = ACO::new(&CITIES, &pheromone_graph, &distance_graph, 10, 100);
-    aco.optimize(short_path);
-    // aco.optimize_concurrent();
-    // aco.optimize_concurrent_rayon(short_path);
+    let cities:Vec<City> = cities_from_coordinates3("coordinates.txt");
+    let shortest_path_idx:Vec<usize> = get_short_path_indicies("shortest_path.txt");
+    let pher_graph = get_pheromone_graph(&cities, 0.0005);
+    let dist_graph = get_distance_graph(&cities);
+    let best_tour:Vec<usize> = {
+        let mut aco = ACO3::new(&cities, pher_graph, dist_graph, 100,10, shortest_path_idx);
+        aco.optimize()
+    };
+    println!("\nbest_tour -> {:?}", best_tour);
 
     println!("\nelapsed time -> {} secs", now.elapsed().as_secs());
     
+    
     }
 
-// TODO -> Move two_opt to global update instead of ant

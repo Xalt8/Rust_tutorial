@@ -1,7 +1,8 @@
 import numpy as np
 from ant import City, calculate_distance
 import time
-import cProfile
+# import cProfile
+
 
 def score_city(from_city_idx:int, 
                to_city_idx:int, 
@@ -12,11 +13,11 @@ def score_city(from_city_idx:int,
 
 
 def make_tour(cities_list:list[City], dist_graph:np.ndarray, pher_graph:np.ndarray, q0=0.90) -> np.ndarray:
-    tour = np.full(shape=len(cities_list), fill_value=999999, dtype=np.int32)
+    tour = []
     cities_idx = np.arange(len(cities_list))
     start_city_indx = np.random.choice(cities_idx)
-    tour[0] = start_city_indx
-    for i in np.arange(start=1, stop=tour.size):
+    tour.append(start_city_indx)
+    for i in np.arange(start=1, stop=cities_idx.size):
         # unvisited_idx = np.setdiff1d(cities_idx, tour)
         unvisited_idx = np.array(list((set(cities_idx) - set(tour))))
         scores = score_city(from_city_idx = tour[i-1], to_city_idx = unvisited_idx, 
@@ -24,11 +25,11 @@ def make_tour(cities_list:list[City], dist_graph:np.ndarray, pher_graph:np.ndarr
         assert unvisited_idx.size == scores.size, "unvisited_idx and scores are not the same size"
 
         if np.random.random() < q0:
-            tour[i] = unvisited_idx[np.argmax(scores)]
+            tour.append(unvisited_idx[np.argmax(scores)])
         else:
             prob_dist = scores/np.sum(scores)
             chosen_city_index = int(np.random.choice(a=unvisited_idx, size=1, p=prob_dist))
-            tour[i] = chosen_city_index
+            tour.append(chosen_city_index)
     # assert np.setdiff1d(tour, cities_idx).size == 0, "tour and city indices are different"
     return tour
 
@@ -37,12 +38,12 @@ def local_pheromone_update(tour:np.ndarray,
                            pher_graph:np.ndarray, 
                            cities_list:list[City], 
                            rho:float=0.1, 
-                           tau:float=0.0005) -> np.ndarray :
+                           tau:float=0.0005) :
     ''' Returns the pheromone graph after appying the local pheromone update rule to the pheromone graph'''
     for from_city_idx in tour:
         for to_city_idx in get_connected_cities_indicies(city_index=from_city_idx, cities=cities_list):
             pher_graph[from_city_idx][to_city_idx] = (1 - rho) * pher_graph[from_city_idx][to_city_idx] + (rho * tau)
-    return pher_graph
+    
 
 
 def global_pheromone_update(best_tour:np.ndarray, 
@@ -83,8 +84,9 @@ def optimize(cities_list:list[City],
 
         tours = np.array([make_tour(cities_list=cities_list, dist_graph=dist_graph, pher_graph=pher_graph)
                         for _ in range(num_ants)])
+        
         for tour in tours:
-            pher_graph = local_pheromone_update(tour= tour, pher_graph= pher_graph, cities_list= cities_list)
+            local_pheromone_update(tour= tour, pher_graph= pher_graph, cities_list= cities_list)
             tour_distance = get_tour_distance(tour=tour, cities_list=cities_list)
             if tour_distance < best_tour_distance:
                 best_tour = tour
@@ -95,7 +97,7 @@ def optimize(cities_list:list[City],
 
 def get_connected_cities_indicies(city_index:int, cities:list[City]) -> np.ndarray:
     """ Returns the index values of the neighbouring and connected cities to a given city_index """
-    assert city_index < len(cities), "The city_index is out of bounds"
+    assert 0 <= city_index < len(cities), "The city_index is out of bounds"
     city_indicies = np.arange(len(cities), dtype=np.int32)
     return city_indicies[city_indicies != city_index]
 
@@ -148,6 +150,7 @@ if __name__ == "__main__":
     start_time = time.perf_counter()
 
     main()
+
 
     end_time = time.perf_counter()
     print(f'\nTime taken: {end_time-start_time:.2f} seconds\n')
