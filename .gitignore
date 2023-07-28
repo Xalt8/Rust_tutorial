@@ -9,3 +9,4 @@ env
 aco/__pycache__/ant.cpython-310.pyc
 .gitignore
 simple_sort.py
+rust_py/target
